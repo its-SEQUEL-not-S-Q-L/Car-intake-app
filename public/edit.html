@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Edit Car - Master Body Shop</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen p-6">
+
+  <header class="bg-blue-600 text-white p-4 shadow mb-6">
+    <h1 class="text-2xl font-bold text-center">Edit Car</h1>
+  </header>
+
+  <div class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow-lg">
+    <form id="edit-form">
+      <input type="hidden" id="car-id" />
+      <div class="mb-4">
+        <label class="block font-semibold">Work Status</label>
+        <select id="work-status" class="border p-2 w-full rounded">
+          <option value="Not Started">Not Started</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Waiting on Parts">Waiting on Parts</option>
+          <option value="Waiting on Customer">Waiting on Customer</option>
+          <option value="Waiting on Insurance">Waiting on Insurance</option>
+          <option value="Done">Done</option>
+        </select>
+      </div>
+
+      <div class="mb-4">
+        <label class="block font-semibold">Ready For Work</label>
+        <select id="ready-for-work" class="border p-2 w-full rounded">
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+
+      <div class="mb-4">
+        <label class="block font-semibold">Bay</label>
+        <input id="bay" class="border p-2 w-full rounded" />
+      </div>
+
+      <div class="mb-4">
+        <label class="block font-semibold">Technician</label>
+        <input id="tech" class="border p-2 w-full rounded" />
+      </div>
+
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Changes</button>
+    </form>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const carId = params.get('id');
+    const form = document.getElementById('edit-form');
+
+    async function loadCar() {
+      const res = await fetch(`/dashboard?id=${carId}`);
+      const car = await res.json();
+      document.getElementById('car-id').value = car.Id;
+      document.getElementById('work-status').value = car.WorkStatus;
+      document.getElementById('ready-for-work').value = car.ReadyForWork;
+      document.getElementById('bay').value = car.Bay || '';
+      document.getElementById('tech').value = car.Tech || '';
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        WorkStatus: document.getElementById('work-status').value,
+        ReadyForWork: document.getElementById('ready-for-work').value,
+        Bay: document.getElementById('bay').value,
+        Tech: document.getElementById('tech').value
+      };
+
+      const res = await fetch(`/cars/${carId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        alert('✅ Car updated successfully');
+        window.location.href = '/dashboard.html';
+      } else {
+        alert('❌ Error updating car');
+      }
+    });
+
+    loadCar();
+  </script>
+
+</body>
+</html>

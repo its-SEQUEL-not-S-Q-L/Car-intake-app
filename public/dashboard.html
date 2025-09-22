@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Master Body Shop - Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen p-6">
+
+  <h1 class="text-2xl font-bold mb-4">Master Body Shop - Dashboard</h1>
+
+
+  <!-- Back to Intake Form Button -->
+  <div class="mb-4">
+    <a href="/index.html" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
+      ← Back to Intake Form
+    </a>
+  </div>
+
+  <!-- Search input -->
+  <div class="mb-4">
+    <input
+      type="text"
+      id="searchInput"
+      placeholder="Search by customer, car, or status..."
+      class="border px-4 py-2 rounded w-full"
+    />
+  </div>
+
+
+  <table class="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
+    <thead class="bg-blue-600 text-white">
+      <tr>
+        <th class="px-4 py-2">Customer</th>
+        <th class="px-4 py-2">Car</th>
+        <th class="px-4 py-2">Status</th>
+        <th class="px-4 py-2">Ready</th>
+        <th class="px-4 py-2">Parts Ordered</th>
+        <th class="px-4 py-2">Notes</th>
+        <th class="px-4 py-2">Payment</th>
+        <th class="px-4 py-2">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="carsTable" class="text-gray-700"></tbody>
+  </table>
+
+  <script>
+    let carsData = [];
+
+    async function fetchCars() {
+      const res = await fetch("/dashboard");
+      carsData = await res.json(); // store globally for search/filter
+
+      renderTable(carsData);
+    }
+
+    function renderTable(cars) {
+      const table = document.getElementById("carsTable");
+      table.innerHTML = "";
+
+      cars.forEach(car => {
+        const row = document.createElement("tr");
+        row.classList.add("border-b");
+
+        row.innerHTML = `
+          <td class="px-4 py-2">${car.Customer}</td>
+          <td class="px-4 py-2">${car.Year || ''} ${car.Make || ''} ${car.Model || ''}</td>
+          <td class="px-4 py-2">
+            <select class="workStatus border px-2 py-1 rounded">
+              <option ${car.WorkStatus === "Received" ? "selected" : ""}>Received</option>
+              <option ${car.WorkStatus === "In Progress" ? "selected" : ""}>In Progress</option>
+              <option ${car.WorkStatus === "Waiting on Parts" ? "selected" : ""}>Waiting on Parts</option>
+              <option ${car.WorkStatus === "Completed" ? "selected" : ""}>Completed</option>
+            </select>
+          </td>
+          <td class="px-4 py-2">
+            <select class="readyForWork border px-2 py-1 rounded">
+              <option ${car.ReadyForWork === "Yes" ? "selected" : ""}>Yes</option>
+              <option ${car.ReadyForWork === "No" ? "selected" : ""}>No</option>
+            </select>
+          </td>
+          <td class="px-4 py-2">
+            <select class="partsOrdered border px-2 py-1 rounded">
+              <option ${car.PartsOrdered === "Yes" ? "selected" : ""}>Yes</option>
+              <option ${car.PartsOrdered === "No" ? "selected" : ""}>No</option>
+              <option ${car.PartsOrdered === "Customer Provided" ? "selected" : ""}>Customer Provided</option>
+            </select>
+          </td>
+          <td class="px-4 py-2">
+            <input type="text" value="${car.Notes || ''}" class="notes border px-2 py-1 rounded w-full">
+          </td>
+          <td class="px-4 py-2 text-center">
+            <input type="checkbox" ${car.CustomerPayment ? "checked" : ""} class="customerPayment">
+          </td>
+          <td class="px-4 py-2 text-center">
+            <button class="updateBtn bg-blue-600 text-white px-3 py-1 rounded">Update</button>
+          </td>
+        `;
+
+        table.appendChild(row);
+
+        const updateBtn = row.querySelector(".updateBtn");
+        updateBtn.addEventListener("click", async () => {
+          const updatedData = {
+            workStatus: row.querySelector(".workStatus").value,
+            readyForWork: row.querySelector(".readyForWork").value,
+            partsOrdered: row.querySelector(".partsOrdered").value,
+            notes: row.querySelector(".notes").value,
+            customerPayment: row.querySelector(".customerPayment").checked
+          };
+
+          const res = await fetch(`/update-car/${car.Id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updatedData)
+          });
+
+          const result = await res.text();
+          alert(result);
+          fetchCars(); // refresh table
+        });
+      });
+    }
+
+    // Search/filter functionality
+    document.getElementById("searchInput").addEventListener("input", e => {
+      const query = e.target.value.toLowerCase();
+      const filtered = carsData.filter(car =>
+        (car.Customer && car.Customer.toLowerCase().includes(query)) ||
+        ((car.Make || '').toLowerCase().includes(query)) ||
+        ((car.Model || '').toLowerCase().includes(query)) ||
+        ((car.WorkStatus || '').toLowerCase().includes(query))
+      );
+      renderTable(filtered);
+    });
+
+    fetchCars();
+  </script>
+</body>
+</html>

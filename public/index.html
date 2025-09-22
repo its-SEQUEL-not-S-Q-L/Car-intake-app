@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Master Body Shop - Car Intake</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white shadow-lg rounded-lg p-8 w-full max-w-lg">
+
+    <!-- Header + Dashboard Link -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-bold text-gray-800">Master Body Shop - Car Intake</h1>
+      <a href="/dashboard.html" class="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors">
+        View Dashboard
+      </a>
+    </div>
+
+    <!-- Intake Form -->
+    <form id="intakeForm" class="space-y-4">
+      <div>
+        <label class="block text-gray-700 font-semibold">Customer</label>
+        <input type="text" name="customer" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Year</label>
+        <input type="number" name="year" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Make</label>
+        <input type="text" name="make" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Model</label>
+        <input type="text" name="model" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">VIN</label>
+        <input type="text" name="vin" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Optional">
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Arrival Date</label>
+        <input type="date" name="arrivalDate" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Parts Ordered</label>
+        <select name="partsOrdered" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+          <option value="Customer Provided">Customer Provided</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Part Order Date</label>
+        <input type="date" name="partOrderDate" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Parts Arrival Date</label>
+        <input type="date" name="partsArrivalDate" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Ready For Work</label>
+        <select name="readyForWork" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="Yes">Yes</option>
+          <option value="No">No</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Work Status</label>
+        <select name="workStatus" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="Received">Received</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Waiting on Parts">Waiting on Parts</option>
+          <option value="Completed">Completed</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Bay</label>
+        <input type="text" name="bay" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Technician</label>
+        <input type="text" name="tech" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div>
+        <label class="block text-gray-700 font-semibold">Date Done</label>
+        <input type="date" name="dateDone" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">Submit</button>
+    </form>
+  </div>
+
+  <!-- <script>
+    document.getElementById("intakeForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(e.target).entries());
+
+      const response = await fetch("/intake", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      const result = await response.text();
+      alert(result);
+      e.target.reset();
+    });
+  </script> -->
+</body>
+</html>
