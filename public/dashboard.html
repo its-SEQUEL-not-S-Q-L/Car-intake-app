@@ -2,23 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Master Body Shop - Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Dashboard - Master Body Shop</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 </head>
-<body class="bg-gray-100 font-sans min-h-screen p-6">
-
-  <h1 class="text-2xl font-bold mb-4">Master Body Shop - Dashboard</h1>
-
-
-  <!-- Back to Intake Form Button -->
-  <div class="mb-4">
-    <a href="/index.html" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
-      ← Back to Intake Form
-    </a>
-  </div>
+<body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col">
+  <!-- Navbar -->
+  <nav class="bg-blue-600 text-white p-4 shadow-md flex justify-between">
+    <h1 class="text-xl font-bold">Master Body Shop</h1>
+    <div>
+      <a href="index.html" class="px-3 hover:underline">Home</a>
+      <a href="dashboard.html" class="px-3 hover:underline">Dashboard</a>
+    </div>
+  </nav>
 
   <!-- Search input -->
-  <div class="mb-4">
+  <div class="p-6">
     <input
       type="text"
       id="searchInput"
@@ -27,86 +25,117 @@
     />
   </div>
 
+  <!-- Cards Grid -->
+  <main id="carsGrid" class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow">
+    <!-- Cars will be inserted here -->
+  </main>
 
-  <table class="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
-    <thead class="bg-blue-600 text-white">
-      <tr>
-        <th class="px-4 py-2">Customer</th>
-        <th class="px-4 py-2">Car</th>
-        <th class="px-4 py-2">Status</th>
-        <th class="px-4 py-2">Ready</th>
-        <th class="px-4 py-2">Parts Ordered</th>
-        <th class="px-4 py-2">Notes</th>
-        <th class="px-4 py-2">Payment</th>
-        <th class="px-4 py-2">Actions</th>
-      </tr>
-    </thead>
-    <tbody id="carsTable" class="text-gray-700"></tbody>
-  </table>
+  <!-- Footer -->
+  <footer class="bg-gray-800 text-white p-4 text-center">
+    Master Body Shop © 2025
+  </footer>
 
   <script>
     let carsData = [];
 
+    // Standard car colors
+    const standardColors = [
+      "White", "Black", "Silver", "Gray", "Blue", "Red", "Green", "Yellow", "Orange", "Brown", "Beige"
+    ];
+
     async function fetchCars() {
       const res = await fetch("/dashboard");
-      carsData = await res.json(); // store globally for search/filter
-
-      renderTable(carsData);
+      carsData = await res.json();
+      renderCards(carsData);
     }
 
-    function renderTable(cars) {
-      const table = document.getElementById("carsTable");
-      table.innerHTML = "";
+    function renderCards(cars) {
+      const grid = document.getElementById("carsGrid");
+      grid.innerHTML = "";
 
       cars.forEach(car => {
-        const row = document.createElement("tr");
-        row.classList.add("border-b");
+        const card = document.createElement("div");
+        card.className = "bg-white rounded-2xl shadow-lg p-5 flex flex-row gap-4 hover:shadow-2xl transition";
 
-        row.innerHTML = `
-          <td class="px-4 py-2">${car.Customer}</td>
-          <td class="px-4 py-2">${car.Year || ''} ${car.Make || ''} ${car.Model || ''}</td>
-          <td class="px-4 py-2">
-            <select class="workStatus border px-2 py-1 rounded">
+        const info = document.createElement("div");
+        info.className = "flex-1";
+
+        info.innerHTML = `
+          <h2 class="text-lg font-bold mb-2">${car.Year || ''} ${car.Make || ''} ${car.Model || ''}</h2>
+          <p><span class="font-semibold">Customer:</span> ${car.Customer || ''}</p>
+          <p><span class="font-semibold">VIN:</span> ${car.VIN || ''}</p>
+
+          <div class="mt-2">
+  <label class="font-semibold block">Color</label>
+  <select class="colorSelect border rounded px-2 py-1 w-full">
+    <option value="" ${!car.Color ? "selected" : ""}>-- Select Color --</option>
+    ${standardColors.map(c => `<option value="${c}" ${car.Color === c ? "selected" : ""}>${c}</option>`).join('')}
+  </select>
+</div>
+
+          <div class="mt-2">
+            <label class="font-semibold block">Status</label>
+            <select class="workStatus border rounded px-2 py-1 w-full">
               <option ${car.WorkStatus === "Received" ? "selected" : ""}>Received</option>
               <option ${car.WorkStatus === "In Progress" ? "selected" : ""}>In Progress</option>
               <option ${car.WorkStatus === "Waiting on Parts" ? "selected" : ""}>Waiting on Parts</option>
               <option ${car.WorkStatus === "Completed" ? "selected" : ""}>Completed</option>
             </select>
-          </td>
-          <td class="px-4 py-2">
-            <select class="readyForWork border px-2 py-1 rounded">
+          </div>
+
+          <div class="mt-2">
+            <label class="font-semibold block">Ready for Work</label>
+            <select class="readyForWork border rounded px-2 py-1 w-full">
               <option ${car.ReadyForWork === "Yes" ? "selected" : ""}>Yes</option>
               <option ${car.ReadyForWork === "No" ? "selected" : ""}>No</option>
             </select>
-          </td>
-          <td class="px-4 py-2">
-            <select class="partsOrdered border px-2 py-1 rounded">
+          </div>
+
+          <div class="mt-2">
+            <label class="font-semibold block">Parts Ordered</label>
+            <select class="partsOrdered border rounded px-2 py-1 w-full">
               <option ${car.PartsOrdered === "Yes" ? "selected" : ""}>Yes</option>
               <option ${car.PartsOrdered === "No" ? "selected" : ""}>No</option>
               <option ${car.PartsOrdered === "Customer Provided" ? "selected" : ""}>Customer Provided</option>
             </select>
-          </td>
-          <td class="px-4 py-2">
+          </div>
+
+          <div class="mt-2">
+            <label class="font-semibold block">Notes</label>
             <input type="text" value="${car.Notes || ''}" class="notes border px-2 py-1 rounded w-full">
-          </td>
-          <td class="px-4 py-2 text-center">
+          </div>
+
+          <div class="mt-2 flex items-center gap-2">
+            <label class="font-semibold">Payment</label>
             <input type="checkbox" ${car.CustomerPayment ? "checked" : ""} class="customerPayment">
-          </td>
-          <td class="px-4 py-2 text-center">
-            <button class="updateBtn bg-blue-600 text-white px-3 py-1 rounded">Update</button>
-          </td>
+          </div>
+
+          <div class="mt-4">
+            <button class="updateBtn bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">Update</button>
+          </div>
         `;
 
-        table.appendChild(row);
+        const photo = document.createElement("div");
+        photo.className = "w-32 h-32 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden";
+        if (car.CarPhoto) {
+          photo.innerHTML = `<img src="data:image/jpeg;base64,${car.CarPhoto}" alt="Car Photo" class="w-full h-full object-cover">`;
+        } else {
+          photo.innerHTML = `<span class="text-gray-500 text-sm">No Photo</span>`;
+        }
 
-        const updateBtn = row.querySelector(".updateBtn");
+        card.appendChild(info);
+        card.appendChild(photo);
+        grid.appendChild(card);
+
+        const updateBtn = info.querySelector(".updateBtn");
         updateBtn.addEventListener("click", async () => {
           const updatedData = {
-            workStatus: row.querySelector(".workStatus").value,
-            readyForWork: row.querySelector(".readyForWork").value,
-            partsOrdered: row.querySelector(".partsOrdered").value,
-            notes: row.querySelector(".notes").value,
-            customerPayment: row.querySelector(".customerPayment").checked
+            workStatus: info.querySelector(".workStatus").value,
+            readyForWork: info.querySelector(".readyForWork").value,
+            partsOrdered: info.querySelector(".partsOrdered").value,
+            notes: info.querySelector(".notes").value,
+            customerPayment: info.querySelector(".customerPayment").checked,
+            color: info.querySelector(".colorSelect").value
           };
 
           const res = await fetch(`/update-car/${car.Id}`, {
@@ -117,12 +146,11 @@
 
           const result = await res.text();
           alert(result);
-          fetchCars(); // refresh table
+          fetchCars();
         });
       });
     }
 
-    // Search/filter functionality
     document.getElementById("searchInput").addEventListener("input", e => {
       const query = e.target.value.toLowerCase();
       const filtered = carsData.filter(car =>
@@ -131,7 +159,7 @@
         ((car.Model || '').toLowerCase().includes(query)) ||
         ((car.WorkStatus || '').toLowerCase().includes(query))
       );
-      renderTable(filtered);
+      renderCards(filtered);
     });
 
     fetchCars();
