@@ -2,23 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Master Body Shop - Dashboard</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Dashboard - Master Body Shop</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-gray-100 font-sans min-h-screen p-6">
-
-  <h1 class="text-2xl font-bold mb-4">Master Body Shop - Dashboard</h1>
-
-
-  <!-- Back to Intake Form Button -->
-  <div class="mb-4">
-    <a href="/index.html" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition">
-      ← Back to Intake Form
-    </a>
-  </div>
+<body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col">
+  <!-- Navbar -->
+  <nav class="bg-blue-600 text-white p-4 shadow-md flex justify-between">
+    <h1 class="text-xl font-bold">Master Body Shop</h1>
+    <div>
+      <a href="index.html" class="px-3 hover:underline">Home</a>
+      <a href="dashboard.html" class="px-3 hover:underline">Dashboard</a>
+    </div>
+  </nav>
 
   <!-- Search input -->
-  <div class="mb-4">
+  <div class="p-6">
     <input
       type="text"
       id="searchInput"
@@ -27,86 +26,191 @@
     />
   </div>
 
+  <!-- Photo Modal -->
+  <div id="photoModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg max-w-4xl max-h-full overflow-hidden">
+      <div class="flex justify-between items-center p-4 border-b">
+        <h3 class="text-lg font-bold">Car Photos</h3>
+        <button id="closeModal" class="text-gray-500 hover:text-gray-700">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div id="modalContent" class="p-4 max-h-96 overflow-y-auto">
+        <!-- Photos will be inserted here -->
+      </div>
+    </div>
+  </div>
 
-  <table class="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
-    <thead class="bg-blue-600 text-white">
-      <tr>
-        <th class="px-4 py-2">Customer</th>
-        <th class="px-4 py-2">Car</th>
-        <th class="px-4 py-2">Status</th>
-        <th class="px-4 py-2">Ready</th>
-        <th class="px-4 py-2">Parts Ordered</th>
-        <th class="px-4 py-2">Notes</th>
-        <th class="px-4 py-2">Payment</th>
-        <th class="px-4 py-2">Actions</th>
-      </tr>
-    </thead>
-    <tbody id="carsTable" class="text-gray-700"></tbody>
-  </table>
+  <!-- Cards Grid -->
+  <main id="carsGrid" class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow">
+    <!-- Cars will be inserted here -->
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-800 text-white p-4 text-center">
+    Master Body Shop © 2025
+  </footer>
 
   <script>
     let carsData = [];
 
     async function fetchCars() {
       const res = await fetch("/dashboard");
-      carsData = await res.json(); // store globally for search/filter
-
-      renderTable(carsData);
+      carsData = await res.json();
+      renderCards(carsData);
     }
 
-    function renderTable(cars) {
-      const table = document.getElementById("carsTable");
-      table.innerHTML = "";
+    async function fetchCarPhotos(carId) {
+      try {
+        const res = await fetch(`/car/${carId}`);
+        const carData = await res.json();
+        return carData.photos || [];
+      } catch (error) {
+        console.error('Error fetching photos:', error);
+        return [];
+      }
+    }
+
+    function renderCards(cars) {
+      const grid = document.getElementById("carsGrid");
+      grid.innerHTML = "";
+
+      if (cars.length === 0) {
+        grid.innerHTML = '<div class="col-span-3 text-center py-10 text-gray-500">No cars found</div>';
+        return;
+      }
 
       cars.forEach(car => {
-        const row = document.createElement("tr");
-        row.classList.add("border-b");
+        const card = document.createElement("div");
+        card.className = "bg-white rounded-2xl shadow-lg p-5 flex flex-col gap-4 hover:shadow-2xl transition";
 
-        row.innerHTML = `
-          <td class="px-4 py-2">${car.Customer}</td>
-          <td class="px-4 py-2">${car.Year || ''} ${car.Make || ''} ${car.Model || ''}</td>
-          <td class="px-4 py-2">
-            <select class="workStatus border px-2 py-1 rounded">
-              <option ${car.WorkStatus === "Received" ? "selected" : ""}>Received</option>
-              <option ${car.WorkStatus === "In Progress" ? "selected" : ""}>In Progress</option>
-              <option ${car.WorkStatus === "Waiting on Parts" ? "selected" : ""}>Waiting on Parts</option>
-              <option ${car.WorkStatus === "Completed" ? "selected" : ""}>Completed</option>
-            </select>
-          </td>
-          <td class="px-4 py-2">
-            <select class="readyForWork border px-2 py-1 rounded">
-              <option ${car.ReadyForWork === "Yes" ? "selected" : ""}>Yes</option>
-              <option ${car.ReadyForWork === "No" ? "selected" : ""}>No</option>
-            </select>
-          </td>
-          <td class="px-4 py-2">
-            <select class="partsOrdered border px-2 py-1 rounded">
-              <option ${car.PartsOrdered === "Yes" ? "selected" : ""}>Yes</option>
-              <option ${car.PartsOrdered === "No" ? "selected" : ""}>No</option>
-              <option ${car.PartsOrdered === "Customer Provided" ? "selected" : ""}>Customer Provided</option>
-            </select>
-          </td>
-          <td class="px-4 py-2">
-            <input type="text" value="${car.Notes || ''}" class="notes border px-2 py-1 rounded w-full">
-          </td>
-          <td class="px-4 py-2 text-center">
+        // Photo section at top
+        const photoSection = document.createElement("div");
+        photoSection.className = "relative";
+        
+        // Main photo display
+        const mainPhoto = document.createElement("div");
+        mainPhoto.className = "w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden cursor-pointer";
+        mainPhoto.setAttribute('data-car-id', car.Id);
+        
+        // Check if car has photos
+        if (car.PhotoCount > 0) {
+          // Fetch and display the first photo
+          fetch(`/photo/${car.Id}?first=true`)
+            .then(response => {
+              if (response.ok) {
+                return response.blob();
+              }
+              throw new Error('Photo not found');
+            })
+            .then(blob => {
+              const url = URL.createObjectURL(blob);
+              mainPhoto.innerHTML = `
+                <img src="${url}" alt="Car Photo" class="w-full h-full object-cover">
+                <div class="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                  ${car.PhotoCount} photo${car.PhotoCount > 1 ? 's' : ''}
+                </div>
+              `;
+            })
+            .catch(error => {
+              mainPhoto.innerHTML = `
+                <div class="text-center text-gray-500">
+                  <i class="fas fa-car text-4xl mb-2"></i>
+                  <p>${car.PhotoCount} photo${car.PhotoCount > 1 ? 's' : ''} available</p>
+                  <button class="viewPhotosBtn mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm" data-car-id="${car.Id}">
+                    View Photos
+                  </button>
+                </div>
+              `;
+            });
+        } else {
+          mainPhoto.innerHTML = `
+            <div class="text-center text-gray-500">
+              <i class="fas fa-camera text-4xl mb-2"></i>
+              <p>No photos</p>
+            </div>
+          `;
+        }
+
+        photoSection.appendChild(mainPhoto);
+        
+        // Car info section
+        const info = document.createElement("div");
+        info.className = "flex-1";
+
+        info.innerHTML = `
+          <h2 class="text-lg font-bold mb-2">${car.Year || ''} ${car.Make || ''} ${car.Model || ''}</h2>
+          <p><span class="font-semibold">Customer:</span> ${car.Customer || ''}</p>
+          <p><span class="font-semibold">VIN:</span> ${car.VIN || 'N/A'}</p>
+          <p class="flex items-center"><span class="font-semibold">Color:</span> 
+            ${car.Color ? `
+              <span class="ml-1 inline-flex items-center">
+                <span class="inline-block w-4 h-4 rounded-full border mr-1" style="background:${car.Color.toLowerCase()}"></span>
+                ${car.Color}
+              </span>
+            ` : 'N/A'}
+          </p>
+          <p><span class="font-semibold">Arrival:</span> ${new Date(car.ArrivalDate).toLocaleDateString()}</p>
+          
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <div>
+              <label class="font-semibold block text-sm">Status</label>
+              <select class="workStatus border rounded px-2 py-1 w-full text-sm">
+                <option ${car.WorkStatus === "Received" ? "selected" : ""}>Received</option>
+                <option ${car.WorkStatus === "In Progress" ? "selected" : ""}>In Progress</option>
+                <option ${car.WorkStatus === "Waiting on Parts" ? "selected" : ""}>Waiting on Parts</option>
+                <option ${car.WorkStatus === "Completed" ? "selected" : ""}>Completed</option>
+              </select>
+            </div>
+            <div>
+              <label class="font-semibold block text-sm">Ready for Work</label>
+              <select class="readyForWork border rounded px-2 py-1 w-full text-sm">
+                <option ${car.ReadyForWork === "Yes" ? "selected" : ""}>Yes</option>
+                <option ${car.ReadyForWork === "No" ? "selected" : ""}>No</option>
+              </select>
+            </div>
+            <div class="col-span-2">
+              <label class="font-semibold block text-sm">Parts Ordered</label>
+              <select class="partsOrdered border rounded px-2 py-1 w-full text-sm">
+                <option ${car.PartsOrdered === "Yes" ? "selected" : ""}>Yes</option>
+                <option ${car.PartsOrdered === "No" ? "selected" : ""}>No</option>
+                <option ${car.PartsOrdered === "Customer Provided" ? "selected" : ""}>Customer Provided</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="mt-2">
+            <label class="font-semibold block text-sm">Notes</label>
+            <input type="text" value="${car.Notes || ''}" class="notes border px-2 py-1 rounded w-full text-sm" placeholder="Add notes...">
+          </div>
+          
+          <div class="mt-2 flex items-center gap-2">
             <input type="checkbox" ${car.CustomerPayment ? "checked" : ""} class="customerPayment">
-          </td>
-          <td class="px-4 py-2 text-center">
-            <button class="updateBtn bg-blue-600 text-white px-3 py-1 rounded">Update</button>
-          </td>
+            <label class="font-semibold text-sm">Payment Received</label>
+          </div>
+
+          <div class="mt-4 flex gap-2">
+            <button class="updateBtn bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex-1">Update</button>
+            <button class="viewPhotosBtn bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 ${car.PhotoCount === 0 ? 'hidden' : ''}" data-car-id="${car.Id}">
+              <i class="fas fa-images"></i>
+            </button>
+          </div>
         `;
 
-        table.appendChild(row);
+        // Assemble card
+        card.appendChild(photoSection);
+        card.appendChild(info);
+        grid.appendChild(card);
 
-        const updateBtn = row.querySelector(".updateBtn");
+        // Add event listeners
+        const updateBtn = info.querySelector(".updateBtn");
         updateBtn.addEventListener("click", async () => {
           const updatedData = {
-            workStatus: row.querySelector(".workStatus").value,
-            readyForWork: row.querySelector(".readyForWork").value,
-            partsOrdered: row.querySelector(".partsOrdered").value,
-            notes: row.querySelector(".notes").value,
-            customerPayment: row.querySelector(".customerPayment").checked
+            workStatus: info.querySelector(".workStatus").value,
+            readyForWork: info.querySelector(".readyForWork").value,
+            partsOrdered: info.querySelector(".partsOrdered").value,
+            notes: info.querySelector(".notes").value,
+            customerPayment: info.querySelector(".customerPayment").checked
           };
 
           const res = await fetch(`/update-car/${car.Id}`, {
@@ -117,23 +221,81 @@
 
           const result = await res.text();
           alert(result);
-          fetchCars(); // refresh table
+          fetchCars(); // refresh
         });
+
+        // Photo viewing functionality
+        const viewPhotosBtn = info.querySelector(".viewPhotosBtn");
+        const mainPhotoDiv = photoSection.querySelector("div");
+        
+        const showPhotos = async (carId) => {
+          const photos = await fetchCarPhotos(carId);
+          if (photos.length === 0) {
+            alert('No photos found for this car');
+            return;
+          }
+          
+          const modal = document.getElementById('photoModal');
+          const modalContent = document.getElementById('modalContent');
+          
+          modalContent.innerHTML = `
+            <div class="text-center mb-4">
+              <h4 class="font-bold">${car.Year || ''} ${car.Make || ''} ${car.Model || ''} - ${car.Customer || ''}</h4>
+              <p class="text-sm text-gray-600">${photos.length} photo${photos.length > 1 ? 's' : ''}</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${photos.map(photo => `
+                <div class="border rounded-lg overflow-hidden">
+                  <img src="/photo/${photo.Id}" alt="Car photo" class="w-full h-48 object-cover">
+                  <div class="p-2 text-xs text-gray-600">
+                    Taken: ${new Date(photo.CreatedAt).toLocaleString()}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+          
+          modal.classList.remove('hidden');
+        };
+        
+        if (viewPhotosBtn) {
+          viewPhotosBtn.addEventListener('click', () => showPhotos(car.Id));
+        }
+        
+        if (mainPhotoDiv) {
+          mainPhotoDiv.addEventListener('click', () => {
+            if (car.PhotoCount > 0) showPhotos(car.Id);
+          });
+        }
       });
     }
 
-    // Search/filter functionality
+    // Close modal functionality
+    document.getElementById('closeModal').addEventListener('click', () => {
+      document.getElementById('photoModal').classList.add('hidden');
+    });
+
+    // Close modal when clicking outside
+    document.getElementById('photoModal').addEventListener('click', (e) => {
+      if (e.target.id === 'photoModal') {
+        document.getElementById('photoModal').classList.add('hidden');
+      }
+    });
+
+    // Search/filter
     document.getElementById("searchInput").addEventListener("input", e => {
       const query = e.target.value.toLowerCase();
       const filtered = carsData.filter(car =>
         (car.Customer && car.Customer.toLowerCase().includes(query)) ||
         ((car.Make || '').toLowerCase().includes(query)) ||
         ((car.Model || '').toLowerCase().includes(query)) ||
-        ((car.WorkStatus || '').toLowerCase().includes(query))
+        ((car.WorkStatus || '').toLowerCase().includes(query)) ||
+        ((car.VIN || '').toLowerCase().includes(query))
       );
-      renderTable(filtered);
+      renderCards(filtered);
     });
 
+    // Initial fetch
     fetchCars();
   </script>
 </body>
