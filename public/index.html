@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <title>Master Body Shop - Car Intake</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Add Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
-<body class="bg-gray-100 font-sans min-h-screen flex items-center justify-center p-6">
-
-  <!-- Card -->
-  <div class="bg-white shadow-2xl rounded-2xl p-8 w-full max-w-3xl space-y-6">
+<body class="bg-gray-100 font-sans min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white shadow-lg rounded-lg p-8 w-full max-w-lg">
 
     <!-- Header + Dashboard Link -->
     <div class="flex justify-between items-center border-b pb-4">
@@ -19,70 +19,44 @@
     </div>
 
     <!-- Intake Form -->
-    <form id="intakeForm" class="grid grid-cols-1 md:grid-cols-2 gap-6" enctype="multipart/form-data">
-      <!-- Customer -->
-      <div class="col-span-2">
-        <label class="block text-gray-700 font-semibold mb-1">Customer</label>
-        <input type="text" name="customer" required class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-      </div>
-
-      <!-- Year -->
+    <form id="intakeForm" class="space-y-4">
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Year</label>
-        <input type="number" name="year" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Customer</label>
+        <input type="text" name="customer" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 
       <!-- Make -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Make</label>
-        <input type="text" name="make" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Year</label>
+        <input type="number" name="year" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 
       <!-- Model -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Model</label>
-        <input type="text" name="model" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Make</label>
+        <input type="text" name="make" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 
-      <!-- Color (dropdown) -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Color</label>
-        <select name="color" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-          <option value="">Select Color</option>
-          <option value="White">White</option>
-          <option value="Black">Black</option>
-          <option value="Gray">Gray</option>
-          <option value="Silver">Silver</option>
-          <option value="Blue">Blue</option>
-          <option value="Red">Red</option>
-          <option value="Green">Green</option>
-          <option value="Yellow">Yellow</option>
-          <option value="Orange">Orange</option>
-          <option value="Brown">Brown</option>
-        </select>
+        <label class="block text-gray-700 font-semibold">Model</label>
+        <input type="text" name="model" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 
-      <!-- VIN + Scan -->
-      <div class="col-span-2">
-        <label class="block text-gray-700 font-semibold mb-1">VIN</label>
-        <div class="flex gap-2">
-          <input type="text" name="vin" id="vin" class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Optional">
-          <button type="button" id="decodeVin" class="bg-indigo-600 text-white px-4 rounded-lg hover:bg-indigo-700 transition">
-            Scan
-          </button>
-        </div>
+      <div>
+        <label class="block text-gray-700 font-semibold">VIN</label>
+        <input type="text" name="vin" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Optional">
       </div>
 
       <!-- Arrival Date -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Arrival Date</label>
-        <input type="date" name="arrivalDate" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Arrival Date</label>
+        <input type="date" name="arrivalDate" required class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 
       <!-- Parts Ordered -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Parts Ordered</label>
-        <select name="partsOrdered" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Parts Ordered</label>
+        <select name="partsOrdered" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="Yes">Yes</option>
           <option value="No">No</option>
           <option value="Customer Provided">Customer Provided</option>
@@ -91,20 +65,20 @@
 
       <!-- Part Order Date -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Part Order Date</label>
-        <input type="date" name="partOrderDate" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Part Order Date</label>
+        <input type="date" name="partOrderDate" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 
       <!-- Parts Arrival Date -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Parts Arrival Date</label>
-        <input type="date" name="partsArrivalDate" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Parts Arrival Date</label>
+        <input type="date" name="partsArrivalDate" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 
       <!-- Ready for Work -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Ready For Work</label>
-        <select name="readyForWork" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Ready For Work</label>
+        <select name="readyForWork" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="Yes">Yes</option>
           <option value="No">No</option>
         </select>
@@ -112,8 +86,8 @@
 
       <!-- Work Status -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Work Status</label>
-        <select name="workStatus" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Work Status</label>
+        <select name="workStatus" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
           <option value="Received">Received</option>
           <option value="In Progress">In Progress</option>
           <option value="Waiting on Parts">Waiting on Parts</option>
@@ -123,90 +97,41 @@
 
       <!-- Bay -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Bay</label>
-        <input type="text" name="bay" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Bay</label>
+        <input type="text" name="bay" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 
       <!-- Technician -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Technician</label>
-        <input type="text" name="tech" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Technician</label>
+        <input type="text" name="tech" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 
       <!-- Date Done -->
       <div>
-        <label class="block text-gray-700 font-semibold mb-1">Date Done</label>
-        <input type="date" name="dateDone" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+        <label class="block text-gray-700 font-semibold">Date Done</label>
+        <input type="date" name="dateDone" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
 
-      <!-- Car Photo Upload with Preview -->
-      <div class="col-span-2">
-        <label class="block text-gray-700 font-semibold mb-1">Car Photo</label>
-        <input type="file" name="carPhoto" id="carPhoto" accept="image/*" capture="environment" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
-        <p class="text-sm text-gray-500 mt-1">You can take a photo directly from your camera or choose an existing file.</p>
-        <img id="photoPreview" class="mt-2 w-full max-h-64 object-contain rounded-lg border" style="display:none;">
-      </div>
-
-      <!-- Submit -->
-      <div class="col-span-2">
-        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition">
-          Submit
-        </button>
-      </div>
+      <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">Submit</button>
     </form>
   </div>
 
-  <script>
-    // VIN decode feature
-    document.getElementById("decodeVin").addEventListener("click", async () => {
-      const vin = document.getElementById("vin").value.trim();
-      if (!vin) return alert("Please enter a VIN to scan.");
-
-      try {
-        const response = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/decodevinvalues/${vin}?format=json`);
-        const data = await response.json();
-        if (data.Results && data.Results[0]) {
-          const result = data.Results[0];
-          document.querySelector("input[name=year]").value = result.ModelYear || "";
-          document.querySelector("input[name=make]").value = result.Make || "";
-          document.querySelector("input[name=model]").value = result.Model || "";
-          document.querySelector("select[name=color]").value = result.Color || "";
-        }
-      } catch (error) {
-        alert("Error decoding VIN. Please try again.");
-      }
-    });
-
-    // Photo preview
-    const carPhotoInput = document.getElementById("carPhoto");
-    const photoPreview = document.getElementById("photoPreview");
-    carPhotoInput.addEventListener("change", () => {
-      const file = carPhotoInput.files[0];
-      if (file) {
-        photoPreview.src = URL.createObjectURL(file);
-        photoPreview.style.display = "block";
-      } else {
-        photoPreview.src = "";
-        photoPreview.style.display = "none";
-      }
-    });
-
-    // Form submission with file upload
+  <!-- <script>
     document.getElementById("intakeForm").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const formData = new FormData(e.target);
+      const data = Object.fromEntries(new FormData(e.target).entries());
 
       const response = await fetch("/intake", {
         method: "POST",
-        body: formData
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
       });
 
       const result = await response.text();
       alert(result);
       e.target.reset();
-      photoPreview.src = "";
-      photoPreview.style.display = "none";
     });
-  </script>
+  </script> -->
 </body>
 </html>

@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard - Master Body Shop</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <title>Master Body Shop - Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col">
   <!-- Navbar -->
@@ -25,15 +25,22 @@
     />
   </div>
 
-  <!-- Cards Grid -->
-  <main id="carsGrid" class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow">
-    <!-- Cars will be inserted here -->
-  </main>
 
-  <!-- Footer -->
-  <footer class="bg-gray-800 text-white p-4 text-center">
-    Master Body Shop © 2025
-  </footer>
+  <table class="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
+    <thead class="bg-blue-600 text-white">
+      <tr>
+        <th class="px-4 py-2">Customer</th>
+        <th class="px-4 py-2">Car</th>
+        <th class="px-4 py-2">Status</th>
+        <th class="px-4 py-2">Ready</th>
+        <th class="px-4 py-2">Parts Ordered</th>
+        <th class="px-4 py-2">Notes</th>
+        <th class="px-4 py-2">Payment</th>
+        <th class="px-4 py-2">Actions</th>
+      </tr>
+    </thead>
+    <tbody id="carsTable" class="text-gray-700"></tbody>
+  </table>
 
   <script>
     let carsData = [];
@@ -45,97 +52,64 @@
 
     async function fetchCars() {
       const res = await fetch("/dashboard");
-      carsData = await res.json();
-      renderCards(carsData);
+      carsData = await res.json(); // store globally for search/filter
+
+      renderTable(carsData);
     }
 
-    function renderCards(cars) {
-      const grid = document.getElementById("carsGrid");
-      grid.innerHTML = "";
+    function renderTable(cars) {
+      const table = document.getElementById("carsTable");
+      table.innerHTML = "";
 
       cars.forEach(car => {
-        const card = document.createElement("div");
-        card.className = "bg-white rounded-2xl shadow-lg p-5 flex flex-row gap-4 hover:shadow-2xl transition";
+        const row = document.createElement("tr");
+        row.classList.add("border-b");
 
-        const info = document.createElement("div");
-        info.className = "flex-1";
-
-        info.innerHTML = `
-          <h2 class="text-lg font-bold mb-2">${car.Year || ''} ${car.Make || ''} ${car.Model || ''}</h2>
-          <p><span class="font-semibold">Customer:</span> ${car.Customer || ''}</p>
-          <p><span class="font-semibold">VIN:</span> ${car.VIN || ''}</p>
-
-          <div class="mt-2">
-  <label class="font-semibold block">Color</label>
-  <select class="colorSelect border rounded px-2 py-1 w-full">
-    <option value="" ${!car.Color ? "selected" : ""}>-- Select Color --</option>
-    ${standardColors.map(c => `<option value="${c}" ${car.Color === c ? "selected" : ""}>${c}</option>`).join('')}
-  </select>
-</div>
-
-          <div class="mt-2">
-            <label class="font-semibold block">Status</label>
-            <select class="workStatus border rounded px-2 py-1 w-full">
+        row.innerHTML = `
+          <td class="px-4 py-2">${car.Customer}</td>
+          <td class="px-4 py-2">${car.Year || ''} ${car.Make || ''} ${car.Model || ''}</td>
+          <td class="px-4 py-2">
+            <select class="workStatus border px-2 py-1 rounded">
               <option ${car.WorkStatus === "Received" ? "selected" : ""}>Received</option>
               <option ${car.WorkStatus === "In Progress" ? "selected" : ""}>In Progress</option>
               <option ${car.WorkStatus === "Waiting on Parts" ? "selected" : ""}>Waiting on Parts</option>
               <option ${car.WorkStatus === "Completed" ? "selected" : ""}>Completed</option>
             </select>
-          </div>
-
-          <div class="mt-2">
-            <label class="font-semibold block">Ready for Work</label>
-            <select class="readyForWork border rounded px-2 py-1 w-full">
+          </td>
+          <td class="px-4 py-2">
+            <select class="readyForWork border px-2 py-1 rounded">
               <option ${car.ReadyForWork === "Yes" ? "selected" : ""}>Yes</option>
               <option ${car.ReadyForWork === "No" ? "selected" : ""}>No</option>
             </select>
-          </div>
-
-          <div class="mt-2">
-            <label class="font-semibold block">Parts Ordered</label>
-            <select class="partsOrdered border rounded px-2 py-1 w-full">
+          </td>
+          <td class="px-4 py-2">
+            <select class="partsOrdered border px-2 py-1 rounded">
               <option ${car.PartsOrdered === "Yes" ? "selected" : ""}>Yes</option>
               <option ${car.PartsOrdered === "No" ? "selected" : ""}>No</option>
               <option ${car.PartsOrdered === "Customer Provided" ? "selected" : ""}>Customer Provided</option>
             </select>
-          </div>
-
-          <div class="mt-2">
-            <label class="font-semibold block">Notes</label>
+          </td>
+          <td class="px-4 py-2">
             <input type="text" value="${car.Notes || ''}" class="notes border px-2 py-1 rounded w-full">
-          </div>
-
-          <div class="mt-2 flex items-center gap-2">
-            <label class="font-semibold">Payment</label>
+          </td>
+          <td class="px-4 py-2 text-center">
             <input type="checkbox" ${car.CustomerPayment ? "checked" : ""} class="customerPayment">
-          </div>
-
-          <div class="mt-4">
-            <button class="updateBtn bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">Update</button>
-          </div>
+          </td>
+          <td class="px-4 py-2 text-center">
+            <button class="updateBtn bg-blue-600 text-white px-3 py-1 rounded">Update</button>
+          </td>
         `;
 
-        const photo = document.createElement("div");
-        photo.className = "w-32 h-32 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden";
-        if (car.CarPhoto) {
-          photo.innerHTML = `<img src="data:image/jpeg;base64,${car.CarPhoto}" alt="Car Photo" class="w-full h-full object-cover">`;
-        } else {
-          photo.innerHTML = `<span class="text-gray-500 text-sm">No Photo</span>`;
-        }
+        table.appendChild(row);
 
-        card.appendChild(info);
-        card.appendChild(photo);
-        grid.appendChild(card);
-
-        const updateBtn = info.querySelector(".updateBtn");
+        const updateBtn = row.querySelector(".updateBtn");
         updateBtn.addEventListener("click", async () => {
           const updatedData = {
-            workStatus: info.querySelector(".workStatus").value,
-            readyForWork: info.querySelector(".readyForWork").value,
-            partsOrdered: info.querySelector(".partsOrdered").value,
-            notes: info.querySelector(".notes").value,
-            customerPayment: info.querySelector(".customerPayment").checked,
-            color: info.querySelector(".colorSelect").value
+            workStatus: row.querySelector(".workStatus").value,
+            readyForWork: row.querySelector(".readyForWork").value,
+            partsOrdered: row.querySelector(".partsOrdered").value,
+            notes: row.querySelector(".notes").value,
+            customerPayment: row.querySelector(".customerPayment").checked
           };
 
           const res = await fetch(`/update-car/${car.Id}`, {
@@ -146,22 +120,25 @@
 
           const result = await res.text();
           alert(result);
-          fetchCars();
+          fetchCars(); // refresh table
         });
       });
     }
 
+    // Search/filter functionality
     document.getElementById("searchInput").addEventListener("input", e => {
       const query = e.target.value.toLowerCase();
       const filtered = carsData.filter(car =>
         (car.Customer && car.Customer.toLowerCase().includes(query)) ||
         ((car.Make || '').toLowerCase().includes(query)) ||
         ((car.Model || '').toLowerCase().includes(query)) ||
-        ((car.WorkStatus || '').toLowerCase().includes(query))
+        ((car.WorkStatus || '').toLowerCase().includes(query)) ||
+        ((car.VIN || '').toLowerCase().includes(query))
       );
       renderCards(filtered);
     });
 
+    // Initial fetch
     fetchCars();
   </script>
 </body>
