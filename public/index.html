@@ -85,10 +85,10 @@
             <div id="cameraControls" class="space-y-3 w-full max-w-md">
               <input type="file" id="fileInput" accept="image/*" capture="camera" class="hidden">
               
-              <div class="flex gap-2 justify-center">
-                <button type="button" id="startCamera" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+            <div class="flex gap-2 justify-center">
+               <!-- <button type="button" id="startCamera" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
                   <i class="fas fa-camera mr-2"></i>Start Camera
-                </button>
+                </button> -->
                 <button type="button" id="capturePhoto" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition hidden">
                   <i class="fas fa-camera-retro mr-2"></i>Capture Photo
                 </button>
@@ -101,8 +101,20 @@
                 <i class="fas fa-stop mr-2"></i>Stop Camera
               </button>
             </div>
-          </div>
-
+            </div>
+            <select name="customerCarrier" class="w-full px-4 py-2 border rounded-lg">
+              <option value="att">AT&T</option>
+              <option value="verizon">Verizon</option>
+              <option value="tmobile" selected>T-Mobile</option>
+              <option value="sprint">Sprint</option>
+              <option value="metro">Metro PCS</option>
+            </select>
+            <div class="col-span-2">
+              <label class="block text-gray-700 font-semibold mb-1">Customer Phone</label>
+              <input type="tel" name="customerPhone"
+                class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="(555) 123-4567">
+            </div>
           <!-- Photo Gallery -->
           <div id="photoGallery" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
             <!-- Photos will be displayed here -->
@@ -202,7 +214,7 @@
     // Camera elements
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    const startCameraBtn = document.getElementById('startCamera');
+    //const startCameraBtn = document.getElementById('startCamera');
     const stopCameraBtn = document.getElementById('stopCamera');
     const capturePhotoBtn = document.getElementById('capturePhoto');
     const uploadPhotoBtn = document.getElementById('uploadPhoto');

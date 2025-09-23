@@ -162,6 +162,10 @@
                 <option ${car.WorkStatus === "Completed" ? "selected" : ""}>Completed</option>
               </select>
             </div>
+            <div class="mt-2">
+  <label class="font-semibold block text-sm">Customer Phone</label>
+  <input type="tel" value="${car.CustomerPhone || ''}" class="customerPhone border px-2 py-1 rounded w-full text-sm" placeholder="(555) 123-4567">
+</div>
             <div>
               <label class="font-semibold block text-sm">Ready for Work</label>
               <select class="readyForWork border rounded px-2 py-1 w-full text-sm">
@@ -205,13 +209,15 @@
         // Add event listeners
         const updateBtn = info.querySelector(".updateBtn");
         updateBtn.addEventListener("click", async () => {
-          const updatedData = {
-            workStatus: info.querySelector(".workStatus").value,
-            readyForWork: info.querySelector(".readyForWork").value,
-            partsOrdered: info.querySelector(".partsOrdered").value,
-            notes: info.querySelector(".notes").value,
-            customerPayment: info.querySelector(".customerPayment").checked
-          };
+         // In your dashboard script, update the updateBtn event listener:
+const updatedData = {
+  workStatus: info.querySelector(".workStatus").value,
+  readyForWork: info.querySelector(".readyForWork").value,
+  partsOrdered: info.querySelector(".partsOrdered").value,
+  notes: info.querySelector(".notes").value,
+  customerPayment: info.querySelector(".customerPayment").checked,
+  customerPhone: info.querySelector(".customerPhone").value // Make sure this exists
+};
 
           const res = await fetch(`/update-car/${car.Id}`, {
             method: "PUT",
