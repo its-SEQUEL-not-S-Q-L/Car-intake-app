@@ -512,6 +512,8 @@ app.get("/dashboard", async (req, res) => {
       whereClauses.push('c.VIN LIKE @vin');
     }
 
+    // Exclude archived cars (Completed and Paid)
+    whereClauses.push("NOT (c.WorkStatus = 'Completed' AND c.CustomerPayment = 1)");
     let whereSQL = whereClauses.length > 0 ? ('WHERE ' + whereClauses.join(' AND ')) : '';
     const result = await request.query(`
       SELECT c.*, 
@@ -530,6 +532,45 @@ app.get("/dashboard", async (req, res) => {
 });
 
 // Manual FREE SMS trigger endpoint
+// Archive dashboard: show only completed and paid cars
+app.get("/archive-dashboard", async (req, res) => {
+  let pool;
+  try {
+    pool = await sql.connect(dbConfig);
+    let whereClauses = ["c.WorkStatus = 'Completed'", "c.CustomerPayment = 1"];
+    let request = pool.request();
+    if (req.query.customer) {
+      request.input('customer', sql.NVarChar, `%${req.query.customer}%`);
+      whereClauses.push('c.Customer LIKE @customer');
+    }
+    if (req.query.make) {
+      request.input('make', sql.NVarChar, `%${req.query.make}%`);
+      whereClauses.push('c.Make LIKE @make');
+    }
+    if (req.query.model) {
+      request.input('model', sql.NVarChar, `%${req.query.model}%`);
+      whereClauses.push('c.Model LIKE @model');
+    }
+    if (req.query.vin) {
+      request.input('vin', sql.NVarChar, `%${req.query.vin}%`);
+      whereClauses.push('c.VIN LIKE @vin');
+    }
+    let whereSQL = 'WHERE ' + whereClauses.join(' AND ');
+    const result = await request.query(`
+      SELECT c.*, 
+             (SELECT COUNT(*) FROM CarPhotos WHERE CarId = c.Id) as PhotoCount
+      FROM Cars c
+      ${whereSQL}
+      ORDER BY c.ArrivalDate DESC
+    `);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error("❌ Database error:", err);
+    res.status(500).send("❌ Error fetching archived cars");
+  } finally {
+    if (pool) await pool.close();
+  }
+});
 app.post("/send-sms/:carId", async (req, res) => {
   try {
     const pool = await sql.connect(dbConfig);
@@ -569,29 +610,40 @@ const upload = multer();
 
 app.post('/upload-photo/:id', upload.single('photo'), async (req, res) => {
   let pool;
-  try {
-    pool = await sql.connect(dbConfig);
-    const carId = req.params.id;
-    if (!req.file) {
-      return res.status(400).send('No photo uploaded');
+  let attempts = 0;
+  const maxAttempts = 3;
+  async function tryUpload() {
+    try {
+      pool = await sql.connect(dbConfig);
+      const carId = req.params.id;
+      if (!req.file) {
+        return res.status(400).send('No photo uploaded');
+      }
+      // Convert buffer to base64 and store with mime type
+      const mimeType = req.file.mimetype;
+      const base64 = req.file.buffer.toString('base64');
+      const photoData = `data:${mimeType};base64,${base64}`;
+      const timestamp = new Date().toISOString();
+      await pool.request()
+        .input('CarId', sql.Int, carId)
+        .input('PhotoData', sql.Text, photoData)
+        .input('Timestamp', sql.NVarChar, timestamp)
+        .query('INSERT INTO CarPhotos (CarId, PhotoData, Timestamp) VALUES (@CarId, @PhotoData, @Timestamp)');
+      res.send('Photo uploaded!');
+    } catch (err) {
+      if (err.code === 'ECONNCLOSED' && attempts < maxAttempts) {
+        attempts++;
+        console.warn(`DB connection closed, retrying upload (${attempts}/${maxAttempts})...`);
+        await new Promise(resolve => setTimeout(resolve, 500 * attempts));
+        return tryUpload();
+      }
+      console.error('❌ Error uploading photo:', err);
+      res.status(500).send('❌ Error uploading photo');
+    } finally {
+      if (pool) await pool.close();
     }
-    // Convert buffer to base64 and store with mime type
-    const mimeType = req.file.mimetype;
-    const base64 = req.file.buffer.toString('base64');
-    const photoData = `data:${mimeType};base64,${base64}`;
-    const timestamp = new Date().toISOString();
-    await pool.request()
-      .input('CarId', sql.Int, carId)
-      .input('PhotoData', sql.Text, photoData)
-      .input('Timestamp', sql.NVarChar, timestamp)
-      .query('INSERT INTO CarPhotos (CarId, PhotoData, Timestamp) VALUES (@CarId, @PhotoData, @Timestamp)');
-    res.send('Photo uploaded!');
-  } catch (err) {
-    console.error('❌ Error uploading photo:', err);
-    res.status(500).send('❌ Error uploading photo');
-  } finally {
-    if (pool) await pool.close();
   }
+  tryUpload();
 });
 app.get("/carriers", (req, res) => {
   res.json(Object.keys(carrierGateways));

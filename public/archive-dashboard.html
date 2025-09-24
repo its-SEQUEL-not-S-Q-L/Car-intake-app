@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Archive Dashboard - Master Body Shop</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col">
+  <!-- Navbar -->
+  <nav class="bg-blue-600 text-white p-4 shadow-md flex justify-between">
+    <h1 class="text-xl font-bold">Master Body Shop</h1>
+    <div>
+      <a href="index.html" class="px-3 hover:underline">Home</a>
+      <a href="dashboard.html" class="px-3 hover:underline">Dashboard</a>
+      <a href="archive-dashboard.html" class="px-3 font-bold underline">Archive</a>
+    </div>
+  </nav>
+
+  <!-- Search/filter -->
+  <div class="p-6 flex flex-col md:flex-row gap-4 items-center">
+    <input type="text" id="searchInput" placeholder="Search by customer, VIN..." class="border px-4 py-2 rounded w-full md:w-1/3" />
+    <input id="makeFilter" type="text" placeholder="Make" class="border px-4 py-2 rounded w-full md:w-1/6" />
+    <input id="modelFilter" type="text" placeholder="Model" class="border px-4 py-2 rounded w-full md:w-1/6" />
+  </div>
+
+  <!-- Cards Grid -->
+  <main id="carsGrid" class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow">
+    <!-- Cars will be inserted here -->
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-gray-800 text-white p-4 text-center">
+    Master Body Shop © 2025
+  </footer>
+
+  <script>
+    let carsData = [];
+
+    async function fetchCars() {
+      const res = await fetch("/archive-dashboard");
+      carsData = await res.json();
+      renderCards(carsData);
+    }
+
+    function renderCards(cars) {
+      const grid = document.getElementById("carsGrid");
+      grid.innerHTML = "";
+      if (cars.length === 0) {
+        grid.innerHTML = '<div class="col-span-3 text-center py-10 text-gray-500">No archived cars found</div>';
+        return;
+      }
+      cars.forEach(car => {
+        const card = document.createElement("div");
+        card.className = "bg-white rounded-2xl shadow-lg p-5 flex flex-col gap-4 hover:shadow-2xl transition";
+        // Photo section
+        const photoSection = document.createElement("div");
+        photoSection.className = "relative";
+        const mainPhoto = document.createElement("div");
+        mainPhoto.className = "w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden cursor-pointer relative";
+        mainPhoto.setAttribute('data-car-id', car.Id);
+        if (car.PhotoCount > 0) {
+          mainPhoto.innerHTML = `
+            <img src="/photo/car/${car.Id}" alt="Car Photo" class="w-full h-full object-cover" onerror="this.style.display='none';this.parentNode.querySelector('.fallback-photo').style.display='flex';">
+            <div class="fallback-photo text-center text-gray-500 absolute inset-0 items-center justify-center hidden flex-col">
+              <i class="fas fa-camera text-4xl mb-2"></i>
+              <p>No preview available</p>
+            </div>
+            <div class="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+              ${car.PhotoCount} photo${car.PhotoCount > 1 ? 's' : ''}
+            </div>
+          `;
+        } else {
+          mainPhoto.innerHTML = `
+            <div class="text-center text-gray-500">
+              <i class="fas fa-camera text-4xl mb-2"></i>
+              <p>No photos</p>
+            </div>
+          `;
+        }
+        photoSection.appendChild(mainPhoto);
+        // Car info section
+        const info = document.createElement("div");
+        info.className = "flex-1";
+        info.innerHTML = `
+          <h2 class="text-lg font-bold mb-2">${car.Year || ''} ${car.Make || ''} ${car.Model || ''}</h2>
+          <p><span class="font-semibold">Customer:</span> ${car.Customer || ''}</p>
+          <p><span class="font-semibold">VIN:</span> ${car.VIN || 'N/A'}</p>
+          <p class="flex items-center"><span class="font-semibold">Color:</span> 
+            ${car.Color ? `
+              <span class="ml-1 inline-flex items-center">
+                <span class="inline-block w-4 h-4 rounded-full border mr-1" style="background:${car.Color.toLowerCase()}"></span>
+                ${car.Color}
+              </span>
+            ` : 'N/A'}
+          </p>
+          <p><span class="font-semibold">Arrival:</span> ${new Date(car.ArrivalDate).toLocaleDateString()}</p>
+          <p><span class="font-semibold">Completed:</span> ${car.WorkStatus === 'Completed' ? (car.DateDone ? new Date(car.DateDone).toLocaleDateString() : 'Yes') : 'No'}</p>
+          <p><span class="font-semibold">Paid:</span> ${car.CustomerPayment ? 'Yes' : 'No'}</p>
+        `;
+        card.appendChild(photoSection);
+        card.appendChild(info);
+        grid.appendChild(card);
+      });
+    }
+
+    function filterCars() {
+      const query = document.getElementById("searchInput").value.toLowerCase();
+      const make = document.getElementById("makeFilter").value.toLowerCase();
+      const model = document.getElementById("modelFilter").value.toLowerCase();
+      let filtered = carsData.filter(car => {
+        let match = true;
+        if (query) {
+          match = match && (
+            (car.Customer && car.Customer.toLowerCase().includes(query)) ||
+            ((car.Make || '').toLowerCase().includes(query)) ||
+            ((car.Model || '').toLowerCase().includes(query)) ||
+            ((car.VIN || '').toLowerCase().includes(query))
+          );
+        }
+        if (make) match = match && (car.Make && car.Make.toLowerCase().includes(make));
+        if (model) match = match && (car.Model && car.Model.toLowerCase().includes(model));
+        return match;
+      });
+      renderCards(filtered);
+    }
+    document.getElementById("searchInput").addEventListener("input", filterCars);
+    document.getElementById("makeFilter").addEventListener("input", filterCars);
+    document.getElementById("modelFilter").addEventListener("input", filterCars);
+    fetchCars();
+  </script>
+</body>
+</html>
