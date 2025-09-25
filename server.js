@@ -166,7 +166,7 @@ app.post('/upload-photo/:carId', upload.array('photo'), async (req, res) => {
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.static(path.join(__dirname, 'views')));
+// app.use(express.static(path.join(__dirname, 'views'))); // Removed to enforce authentication on HTML files
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'bodyshop_secret',
@@ -620,7 +620,16 @@ app.put("/update-car/:id", async (req, res) => {
     const newCustomerPhone = typeof customerPhone !== 'undefined' && customerPhone !== null && customerPhone !== '' ? customerPhone : currentCar.CustomerPhone ?? null;
     const newCustomerCarrier = typeof customerCarrier !== 'undefined' && customerCarrier !== null && customerCarrier !== '' ? customerCarrier : currentCar.CustomerCarrier ?? null;
 
-    await pool.request()
+    let updateQuery = `
+      UPDATE Cars
+      SET WorkStatus = @WorkStatus,
+          ReadyForWork = @ReadyForWork,
+          PartsOrdered = @PartsOrdered,
+          Notes = @Notes,
+          CustomerPayment = @CustomerPayment,
+          CustomerPhone = ISNULL(@CustomerPhone, CustomerPhone),
+          CustomerCarrier = ISNULL(@CustomerCarrier, CustomerCarrier`;
+    let updateRequest = pool.request()
       .input("Id", sql.Int, id)
       .input("WorkStatus", sql.NVarChar, newWorkStatus)
       .input("ReadyForWork", sql.NVarChar, newReadyForWork)
@@ -628,18 +637,14 @@ app.put("/update-car/:id", async (req, res) => {
       .input("Notes", sql.NVarChar, newNotes)
       .input("CustomerPayment", sql.Bit, newCustomerPayment)
       .input("CustomerPhone", sql.NVarChar, newCustomerPhone)
-      .input("CustomerCarrier", sql.NVarChar, newCustomerCarrier)
-      .query(`
-        UPDATE Cars
-        SET WorkStatus = @WorkStatus,
-            ReadyForWork = @ReadyForWork,
-            PartsOrdered = @PartsOrdered,
-            Notes = @Notes,
-            CustomerPayment = @CustomerPayment,
-            CustomerPhone = ISNULL(@CustomerPhone, CustomerPhone),
-            CustomerCarrier = ISNULL(@CustomerCarrier, CustomerCarrier)
-        WHERE Id = @Id
-      `);
+      .input("CustomerCarrier", sql.NVarChar, newCustomerCarrier);
+    // If status is being set to Completed, set DateDone to today
+    if (workStatus === "Completed" && previousStatus !== "Completed") {
+      updateQuery += ", DateDone = @DateDone";
+      updateRequest.input("DateDone", sql.Date, new Date());
+    }
+    updateQuery += ") WHERE Id = @Id";
+    await updateRequest.query(updateQuery);
 
     // Send FREE SMS notification if status changed to "Completed"
     if (workStatus === "Completed" && previousStatus !== "Completed") {
@@ -987,9 +992,6 @@ app.post("/send-sms/:carId", async (req, res) => {
 
 // Get available carriers
 // Serve car-details.html
-app.get('/car-details.html', (req, res) => {
-  res.sendFile(path.join(__dirname, 'views', 'car-details.html'));
-});
 // Photo upload for a specific car
 
 
@@ -1044,11 +1046,26 @@ app.get("/", (req, res) => {
 app.get("/dashboard.html", requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, "views", "dashboard.html"));
 });
+app.get("/dashboard-inprogress.html", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "dashboard-inprogress.html"));
+});
+app.get("/dashboard-received.html", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "dashboard-received.html"));
+});
+app.get("/dashboard-completed.html", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "dashboard-completed.html"));
+});
+app.get("/dashboard-archived.html", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "dashboard-archived.html"));
+});
 app.get("/welcome.html", requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, "views", "welcome.html"));
 });
 app.get("/admin-dashboard.html", requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, "views", "admin-dashboard.html"));
+});
+app.get("/car-details.html", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "car-details.html"));
 });
 
 const PORT = 3030;
