@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard - User & Role Management</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col">
+  <div class="w-full flex justify-center pt-8">
+    <div class="flex gap-4">
+      <a href="/welcome.html" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition flex items-center">
+        <i class="fas fa-home mr-2"></i> Home
+      </a>
+      <a href="/dashboard.html" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center">
+        <i class="fas fa-tachometer-alt mr-2"></i> View Dashboard
+      </a>
+      <button type="button" id="logoutBtn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition flex items-center">
+        <i class="fas fa-sign-out-alt mr-2"></i> Logout
+      </button>
+    </div>
+  </div>
+
+  <main class="p-6 flex flex-col items-center">
+    <section id="adminUserMgmt" class="p-6 mb-6 bg-white rounded-xl shadow-lg w-full max-w-2xl">
+      <h2 class="text-2xl font-bold mb-4">User & Role Management</h2>
+      <table class="w-full text-left border">
+        <thead>
+          <tr>
+            <th class="p-2 border">Username</th>
+            <th class="p-2 border">Role</th>
+            <th class="p-2 border">Change Role</th>
+            <th class="p-2 border">Delete</th>
+          </tr>
+        </thead>
+        <tbody id="usersTableBody"></tbody>
+      </table>
+      <span id="userMgmtStatus" class="text-green-600 text-sm"></span>
+    </section>
+  </main>
+
+  <footer class="bg-gray-800 text-white p-4 text-center">
+    Master Body Shop © 2025
+  </footer>
+
+  <script>
+    async function checkAdmin() {
+      const res = await fetch('/api/me');
+      if (res.ok) {
+        const me = await res.json();
+        if (me.role !== 'admin') {
+          window.location.href = '/dashboard.html';
+        } else {
+          fetchUsers();
+        }
+      } else {
+        window.location.href = '/';
+      }
+    }
+
+    async function fetchUsers() {
+      const res = await fetch('/api/users');
+      if (!res.ok) return;
+      const users = await res.json();
+      const tbody = document.getElementById('usersTableBody');
+      tbody.innerHTML = '';
+      users.forEach(user => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="p-2 border">${user.Username}</td>
+          <td class="p-2 border">${user.Role}</td>
+          <td class="p-2 border">
+            <select data-username="${user.Username}" class="roleSelect border rounded px-2 py-1">
+              <option value="admin" ${user.Role === 'admin' ? 'selected' : ''}>Admin</option>
+              <option value="technician" ${user.Role === 'technician' ? 'selected' : ''}>Technician</option>
+            </select>
+            <button data-username="${user.Username}" class="saveRoleBtn bg-blue-500 text-white px-2 py-1 rounded ml-2">Save</button>
+          </td>
+          <td class="p-2 border">
+            <button data-username="${user.Username}" class="deleteUserBtn bg-red-500 text-white px-2 py-1 rounded">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.querySelectorAll('.saveRoleBtn').forEach(btn => {
+        btn.onclick = async function() {
+          const username = btn.getAttribute('data-username');
+          const select = btn.parentElement.querySelector('.roleSelect');
+          const role = select.value;
+          const res = await fetch('/api/users/role', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, role })
+          });
+          document.getElementById('userMgmtStatus').textContent = await res.text();
+          fetchUsers();
+        };
+      });
+      document.querySelectorAll('.deleteUserBtn').forEach(btn => {
+        btn.onclick = async function() {
+          const username = btn.getAttribute('data-username');
+          const res = await fetch('/api/users/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+          });
+          document.getElementById('userMgmtStatus').textContent = await res.text();
+          fetchUsers();
+        };
+      });
+    }
+
+    checkAdmin();
+    document.getElementById('logoutBtn').addEventListener('click', async function() {
+      await fetch('/logout', { method: 'POST' });
+      window.location.href = '/';
+    });
+  </script>
+</body>
+</html>

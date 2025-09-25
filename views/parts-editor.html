@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Edit Parts List</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col">
+  <div class="w-full flex justify-center pt-8">
+    <a id="backToCarDetailsBtn" href="#" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition flex items-center">
+      <i class="fas fa-arrow-left mr-2"></i> Back to Car Details
+    </a>
+  </div>
+  <main class="p-6 flex flex-col items-center">
+    <section id="partsEditor" class="p-6 mb-6 bg-white rounded-xl shadow-lg w-full max-w-2xl">
+      <h2 class="text-2xl font-bold mb-4">Edit Parts List</h2>
+      <form id="addPartForm" class="flex gap-2 mb-4">
+        <input type="text" name="partName" placeholder="Part name" required class="border px-2 py-1 rounded w-full">
+        <select name="status" class="border px-2 py-1 rounded">
+          <option value="Pending">Not Ordered</option>
+          <option value="Ordered">Ordered</option>
+          <option value="Arrived">Arrived</option>
+          <option value="Customer Provided">Customer Provided</option>
+        </select>
+        <button type="submit" class="bg-green-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-green-700 transition">Add Part</button>
+      </form>
+      <table class="w-full border mb-4">
+        <thead>
+          <tr>
+            <th class="p-2 border">Part Name</th>
+            <th class="p-2 border">Status</th>
+            <th class="p-2 border">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="partsTableBody"></tbody>
+      </table>
+      <span id="partsStatus" class="text-green-600 text-sm"></span>
+    </section>
+  </main>
+  <footer class="bg-gray-800 text-white p-4 text-center">
+    Master Body Shop © 2025
+  </footer>
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const carId = urlParams.get('id');
+    // Update Back to Car Details button to include carId
+    document.addEventListener('DOMContentLoaded', function() {
+      const backBtn = document.getElementById('backToCarDetailsBtn');
+      if (backBtn && carId) {
+        backBtn.href = `/car-details.html?carId=${encodeURIComponent(carId)}`;
+      }
+    });
+    async function fetchParts() {
+      const res = await fetch(`/car/${carId}/parts`);
+      if (!res.ok) return;
+      const parts = await res.json();
+      const tbody = document.getElementById('partsTableBody');
+      tbody.innerHTML = '';
+      parts.forEach((part, idx) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="p-2 border">${part.name}</td>
+          <td class="p-2 border">
+            <select data-idx="${idx}" class="statusSelect border rounded px-2 py-1">
+              <option value="Pending" ${part.status === 'Pending' ? 'selected' : ''}>Not Ordered</option>
+              <option value="Ordered" ${part.status === 'Ordered' ? 'selected' : ''}>Ordered</option>
+              <option value="Arrived" ${part.status === 'Arrived' ? 'selected' : ''}>Arrived</option>
+              <option value="Customer Provided" ${part.status === 'Customer Provided' ? 'selected' : ''}>Customer Provided</option>
+            </select>
+          </td>
+          <td class="p-2 border">
+            <button data-idx="${idx}" class="deletePartBtn bg-red-500 text-white px-2 py-1 rounded">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+      document.querySelectorAll('.statusSelect').forEach(sel => {
+        sel.onchange = async function() {
+          const idx = sel.getAttribute('data-idx');
+          const status = sel.value;
+          await fetch(`/car/${carId}/parts`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idx, status })
+          });
+          fetchParts();
+        };
+      });
+      document.querySelectorAll('.deletePartBtn').forEach(btn => {
+        btn.onclick = async function() {
+          const idx = btn.getAttribute('data-idx');
+          await fetch(`/car/${carId}/parts`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idx })
+          });
+          fetchParts();
+        };
+      });
+    }
+    document.getElementById('addPartForm').onsubmit = async function(e) {
+      e.preventDefault();
+      const form = e.target;
+      const partName = form.partName.value;
+      const status = form.status.value;
+      await fetch(`/car/${carId}/parts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ partName, status })
+      });
+      form.reset();
+      fetchParts();
+    };
+    fetchParts();
+  </script>
+</body>
+</html>
