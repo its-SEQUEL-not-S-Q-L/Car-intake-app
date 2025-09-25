@@ -1,3 +1,4 @@
+
 const express = require("express");
 const sql = require("mssql");
 const path = require("path");
@@ -50,7 +51,7 @@ app.use(session({
 const dbConfig = {
   user: "sa",
   password: "Welcome@100Y!",
-  server: "Legion-Y-7000p",
+  server: "desktop-kgduetp",
   database: "BodyshopDB",
   options: {
     encrypt: false,
@@ -492,8 +493,8 @@ app.put("/update-car/:id", async (req, res) => {
             PartsOrdered = @PartsOrdered,
             Notes = @Notes,
             CustomerPayment = @CustomerPayment,
-            CustomerPhone = COALESCE(@CustomerPhone, CustomerPhone),
-            CustomerCarrier = COALESCE(@CustomerCarrier, CustomerCarrier)
+            CustomerPhone = ISNULL(@CustomerPhone, CustomerPhone),
+            CustomerCarrier = ISNULL(@CustomerCarrier, CustomerCarrier)
         WHERE Id = @Id
       `);
 
@@ -727,6 +728,8 @@ app.get("/photo/car/:carId", async (req, res) => {
 // Get all cars for dashboard
 app.get("/dashboard", requireAuth, async (req, res) => {
   try {
+    pool = await sql.connect(dbConfig);
+    
     if (req.query.id) {
       const result = await pool.request()
         .input('id', sql.Int, req.query.id)
@@ -736,17 +739,18 @@ app.get("/dashboard", requireAuth, async (req, res) => {
           FROM Cars c 
           WHERE c.Id = @id
         `);
-      return res.json({ success: true, data: result.recordset[0] });
+      return res.json(result.recordset[0]);
     }
 
     const result = await pool.request().query(`
       SELECT c.*, 
              (SELECT COUNT(*) FROM CarPhotos WHERE CarId = c.Id) as PhotoCount
-      FROM Cars c 
+      FROM Cars c
+      ${whereSQL}
       ORDER BY c.ArrivalDate DESC
     `);
     
-    res.json({ success: true, data: result.recordset });
+    res.json(result.recordset);
   } catch (err) {
     console.error("❌ Database error:", err);
     res.status(500).json({ 
@@ -802,6 +806,36 @@ app.post("/send-sms/:carId", async (req, res) => {
 });
 
 // Get available carriers
+// Photo upload for a specific car
+const multer = require('multer');
+const upload = multer();
+
+app.post('/upload-photo/:id', upload.single('photo'), async (req, res) => {
+  let pool;
+  try {
+    pool = await sql.connect(dbConfig);
+    const carId = req.params.id;
+    if (!req.file) {
+      return res.status(400).send('No photo uploaded');
+    }
+    // Convert buffer to base64 and store with mime type
+    const mimeType = req.file.mimetype;
+    const base64 = req.file.buffer.toString('base64');
+    const photoData = `data:${mimeType};base64,${base64}`;
+    const timestamp = new Date().toISOString();
+    await pool.request()
+      .input('CarId', sql.Int, carId)
+      .input('PhotoData', sql.Text, photoData)
+      .input('Timestamp', sql.NVarChar, timestamp)
+      .query('INSERT INTO CarPhotos (CarId, PhotoData, Timestamp) VALUES (@CarId, @PhotoData, @Timestamp)');
+    res.send('Photo uploaded!');
+  } catch (err) {
+    console.error('❌ Error uploading photo:', err);
+    res.status(500).send('❌ Error uploading photo');
+  } finally {
+    if (pool) await pool.close();
+  }
+});
 app.get("/carriers", (req, res) => {
   res.json({ success: true, data: Object.keys(carrierGateways) });
 });
@@ -821,94 +855,6 @@ app.get("/welcome.html", requireAuth, (req, res) => {
 app.get("/admin-dashboard.html", requireAuth, (req, res) => {
   res.sendFile(path.join(__dirname, "views", "admin-dashboard.html"));
 });
-app.get("/car-details.html", requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "car-details.html"));
-});
-app.get("/parts-editor.html", requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "parts-editor.html"));
-});
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ 
-    success: false, 
-    message: 'Internal server error',
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
-  });
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ success: false, message: 'Endpoint not found' });
-});
-
-const PORT = process.env.PORT || 3030;
-
-// Start server
-initializeApp().then(() => {
-  app.listen(PORT, () => console.log(`🚗 Server running on http://localhost:${PORT} (FREE SMS Enabled)`));
-}).catch(err => {
-  console.error('Failed to start server:', err);
-  process.exit(1);
-});
-
-// Graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('Shutting down gracefully...');
-  if (pool) {
-    await pool.close();
-  }
-  process.exit(0);
-});
-
-app.post('/login', express.json(), async (req, res) => {
-  const { username, password } = req.body;
-  if (!username || !password) return res.status(400).json({ success: false, message: 'Missing username or password' });
-  try {
-    const result = await pool.request()
-      .input('Username', sql.NVarChar, username)
-      .query('SELECT * FROM Users WHERE Username = @Username');
-    if (result.recordset.length === 0) return res.json({ success: false, message: 'Invalid username or password' });
-    const user = result.recordset[0];
-    const valid = await bcrypt.compare(password, user.PasswordHash);
-    if (valid) {
-      // You may want to set session here if using express-session
-      return res.json({ success: true, message: 'Login successful', user: { username: user.Username, role: user.Role } });
-    }
-    res.json({ success: false, message: 'Invalid username or password' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'Login error', error: err.message });
-  }
-});
-
-// Get notes for a car
-app.get('/car/:id/notes', requireAuth, async (req, res) => {
-  try {
-    const carId = parseInt(req.params.id);
-    const result = await pool.request()
-      .input('CarId', sql.Int, carId)
-      .query('SELECT * FROM CarNotes WHERE CarId = @CarId ORDER BY Timestamp DESC');
-    res.json(result.recordset);
-  } catch (err) {
-    res.status(500).send('Error fetching notes');
-  }
-});
-
-// Add a note to a car
-app.post('/car/:id/notes', requireAuth, express.json(), async (req, res) => {
-  try {
-    const carId = parseInt(req.params.id);
-    const { note } = req.body;
-    const username = req.session.user.username;
-    if (!note || !username) return res.status(400).send('Missing note or user');
-    await pool.request()
-      .input('CarId', sql.Int, carId)
-      .input('Username', sql.NVarChar, username)
-      .input('Note', sql.NVarChar, note)
-      .query('INSERT INTO CarNotes (CarId, Username, Note) VALUES (@CarId, @Username, @Note)');
-    res.send('Note added');
-  } catch (err) {
-    res.status(500).send('Error adding note');
-  }
-});
+const PORT = 3030;
+app.listen(PORT, () => console.log(`🚗 Server running on http://localhost:${PORT} (FREE SMS Enabled)`));

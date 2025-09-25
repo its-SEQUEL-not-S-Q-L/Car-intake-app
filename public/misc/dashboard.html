@@ -198,12 +198,6 @@
             <label class="font-semibold text-sm">Payment Received</label>
           </div>
 
-          <form class="mt-2 flex gap-2 items-center photoUploadForm" enctype="multipart/form-data">
-            <input type="file" name="photo" accept="image/*" multiple class="photoInput border px-2 py-1 rounded text-sm" style="max-width: 180px;" />
-            <button type="submit" class="bg-purple-500 text-white px-3 py-1 rounded text-sm">Add Photo(s)</button>
-            <span class="uploadStatus text-xs text-gray-500"></span>
-          </form>
-
           <div class="mt-4 flex gap-2">
             <button class="updateBtn bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex-1">Update</button>
             <button class="viewPhotosBtn bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 ${car.PhotoCount === 0 ? 'hidden' : ''}" data-car-id="${car.Id}">
@@ -218,35 +212,6 @@
         grid.appendChild(card);
 
         // Add event listeners
-        // Photo upload functionality
-        const photoForm = info.querySelector('.photoUploadForm');
-        const photoInput = info.querySelector('.photoInput');
-        const uploadStatus = info.querySelector('.uploadStatus');
-        if (photoForm && photoInput) {
-          photoForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            if (!photoInput.files.length) {
-              uploadStatus.textContent = 'Select photo(s) first.';
-              return;
-            }
-            const formData = new FormData();
-            for (const file of photoInput.files) {
-              formData.append('photo', file);
-            }
-            uploadStatus.textContent = 'Uploading...';
-            try {
-              const res = await fetch(`/upload-photo/${car.Id}`, {
-                method: 'POST',
-                body: formData
-              });
-              const result = await res.text();
-              uploadStatus.textContent = result;
-              fetchCars(); // refresh
-            } catch (err) {
-              uploadStatus.textContent = 'Upload failed.';
-            }
-          });
-        }
         const updateBtn = info.querySelector(".updateBtn");
         updateBtn.addEventListener("click", async () => {
          // In your dashboard script, update the updateBtn event listener:
