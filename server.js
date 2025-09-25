@@ -808,7 +808,7 @@ app.post("/send-sms/:carId", async (req, res) => {
 // Get available carriers
 // Photo upload for a specific car
 const multer = require('multer');
-const upload = multer();
+
 
 app.post('/upload-photo/:id', upload.single('photo'), async (req, res) => {
   let pool;
