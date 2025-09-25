@@ -24,6 +24,7 @@
       <h2 class="text-2xl font-bold mb-4">Car Details</h2>
       <div id="detailsContent"></div>
       <form id="editCarForm" class="space-y-4"></form>
+  <section id="notesSection" class="mb-6"></section>
       <div id="partsSection" class="mt-6"></div>
     <div class="flex items-center justify-between mt-6">
       <div id="partsSection" class=""></div>
@@ -59,6 +60,50 @@
     Master Body Shop © 2025
   </footer>
   <script>
+  // --- Notes Section ---
+  async function fetchNotes() {
+    const res = await fetch(`/car/${carId}/notes`, { credentials: 'include' });
+    if (!res.ok) return;
+    const notes = await res.json();
+    const notesSection = document.getElementById('notesSection');
+    if (notes.length > 0) {
+      notesSection.innerHTML = `
+        <h3 class="text-lg font-bold mb-2">Notes</h3>
+        <div class="space-y-2 mb-4">
+          ${notes.map(note => `
+            <div class="bg-gray-100 rounded-lg p-3">
+              <div class="text-sm text-gray-700">${note.Note}</div>
+              <div class="text-xs text-gray-500 mt-1">By <b>${note.Username}</b> on ${new Date(note.Timestamp).toLocaleString()}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else {
+      notesSection.innerHTML = '';
+    }
+    // Add note form
+    notesSection.innerHTML += `
+      <form id="addNoteForm" class="flex gap-2 mt-2">
+        <input type="text" name="note" placeholder="Add a note..." required class="border px-2 py-1 rounded w-full">
+        <button type="submit" class="bg-blue-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-700 transition">Add Note</button>
+      </form>
+      <span id="noteStatus" class="text-green-600 text-sm"></span>
+    `;
+    document.getElementById('addNoteForm').onsubmit = async function(e) {
+      e.preventDefault();
+      const form = e.target;
+      const note = form.note.value;
+      const res = await fetch(`/car/${carId}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note }),
+        credentials: 'include'
+      });
+      document.getElementById('noteStatus').textContent = await res.text();
+      form.reset();
+      fetchNotes();
+    };
+  }
   // Photo upload logic
   document.getElementById('photoUploadForm').onsubmit = async function(e) {
     e.preventDefault();
@@ -101,6 +146,7 @@
   let car = null;
 
   async function fetchCarDetails() {
+  await fetchNotes();
     // Fetch car photos
     const photosRes = await fetch(`/car/${carId}/photos`);
     let photos = [];

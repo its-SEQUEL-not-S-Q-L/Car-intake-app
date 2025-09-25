@@ -881,3 +881,34 @@ app.post('/login', express.json(), async (req, res) => {
     res.status(500).json({ success: false, message: 'Login error', error: err.message });
   }
 });
+
+// Get notes for a car
+app.get('/car/:id/notes', requireAuth, async (req, res) => {
+  try {
+    const carId = parseInt(req.params.id);
+    const result = await pool.request()
+      .input('CarId', sql.Int, carId)
+      .query('SELECT * FROM CarNotes WHERE CarId = @CarId ORDER BY Timestamp DESC');
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).send('Error fetching notes');
+  }
+});
+
+// Add a note to a car
+app.post('/car/:id/notes', requireAuth, express.json(), async (req, res) => {
+  try {
+    const carId = parseInt(req.params.id);
+    const { note } = req.body;
+    const username = req.session.user.username;
+    if (!note || !username) return res.status(400).send('Missing note or user');
+    await pool.request()
+      .input('CarId', sql.Int, carId)
+      .input('Username', sql.NVarChar, username)
+      .input('Note', sql.NVarChar, note)
+      .query('INSERT INTO CarNotes (CarId, Username, Note) VALUES (@CarId, @Username, @Note)');
+    res.send('Note added');
+  } catch (err) {
+    res.status(500).send('Error adding note');
+  }
+});
