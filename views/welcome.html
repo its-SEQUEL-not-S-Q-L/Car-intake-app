@@ -14,10 +14,17 @@
 
     <!-- Header + Dashboard Link -->
     <div class="flex justify-between items-center border-b pb-4">
-      <h1 class="text-3xl font-extrabold text-gray-800">Master Body Shop</h1>
-      <a href="/dashboard.html" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition">
-        View Dashboard
-      </a>
+      <div class="flex gap-2 items-center">
+        <a href="/welcome.html" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition flex items-center">
+          <i class="fas fa-home mr-2"></i> Home
+        </a>
+        <a href="/dashboard.html" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition">
+          View Dashboard
+        </a>
+        <button type="button" id="logoutBtn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition flex items-center">
+          <i class="fas fa-sign-out-alt mr-2"></i> Logout
+        </button>
+      </div>
     </div>
 
     <!-- Intake Form -->
@@ -86,9 +93,9 @@
               <input type="file" id="fileInput" accept="image/*" capture="camera" class="hidden">
               
             <div class="flex gap-2 justify-center">
-               <!-- <button type="button" id="startCamera" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+               <button type="button" id="startCamera" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
                   <i class="fas fa-camera mr-2"></i>Start Camera
-                </button> -->
+                </button>
                 <button type="button" id="capturePhoto" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition hidden">
                   <i class="fas fa-camera-retro mr-2"></i>Capture Photo
                 </button>
@@ -208,13 +215,17 @@
   </div>
 
   <script>
+    document.getElementById('logoutBtn').addEventListener('click', async function() {
+      await fetch('/logout', { method: 'POST' });
+      window.location.href = '/';
+    });
     // Array to store base64 encoded photos
     let carPhotos = [];
 
     // Camera elements
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
-    //const startCameraBtn = document.getElementById('startCamera');
+    const startCameraBtn = document.getElementById('startCamera');
     const stopCameraBtn = document.getElementById('stopCamera');
     const capturePhotoBtn = document.getElementById('capturePhoto');
     const uploadPhotoBtn = document.getElementById('uploadPhoto');

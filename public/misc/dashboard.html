@@ -7,23 +7,41 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col">
-  <!-- Navbar -->
-  <nav class="bg-blue-600 text-white p-4 shadow-md flex justify-between">
-    <h1 class="text-xl font-bold">Master Body Shop</h1>
-    <div>
-      <a href="index.html" class="px-3 hover:underline">Home</a>
-      <a href="dashboard.html" class="px-3 hover:underline">Dashboard</a>
+  <!-- Button Group -->
+  <div class="w-full flex justify-center pt-8">
+    <div class="flex gap-4">
+      <a href="/welcome.html" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition flex items-center">
+        <i class="fas fa-home mr-2"></i> Home
+      </a>
+      <a href="/dashboard.html" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center">
+        <i class="fas fa-tachometer-alt mr-2"></i> View Dashboard
+      </a>
+      <button type="button" id="logoutBtn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition flex items-center">
+        <i class="fas fa-sign-out-alt mr-2"></i> Logout
+      </button>
     </div>
-  </nav>
+  </div>
 
   <!-- Search input -->
-  <div class="p-6">
+  <div class="p-6 flex flex-col md:flex-row gap-4 items-center">
     <input
       type="text"
       id="searchInput"
-      placeholder="Search by customer, car, or status..."
-      class="border px-4 py-2 rounded w-full"
+      placeholder="Search by customer, VIN..."
+      class="border px-4 py-2 rounded w-full md:w-1/3"
     />
+    <select id="statusFilter" class="border px-4 py-2 rounded w-full md:w-1/6">
+      <option value="">All Statuses</option>
+      <option>Received</option>
+      <option>In Progress</option>
+      <option>Waiting on Parts</option>
+      <option>Completed</option>
+    </select>
+    <input id="makeFilter" type="text" placeholder="Make" class="border px-4 py-2 rounded w-full md:w-1/6" />
+    <input id="modelFilter" type="text" placeholder="Model" class="border px-4 py-2 rounded w-full md:w-1/6" />
+    <label class="flex items-center gap-2"><input type="checkbox" id="readyFilter"> Ready</label>
+    <label class="flex items-center gap-2"><input type="checkbox" id="paymentFilter"> Paid</label>
+    <label class="flex items-center gap-2"><input type="checkbox" id="partsFilter"> Parts Ordered</label>
   </div>
 
   <!-- Photo Modal -->
@@ -52,6 +70,10 @@
   </footer>
 
   <script>
+    document.getElementById('logoutBtn').addEventListener('click', async function() {
+      await fetch('/logout', { method: 'POST' });
+      window.location.href = '/';
+    });
     let carsData = [];
 
     async function fetchCars() {
@@ -87,42 +109,25 @@
         // Photo section at top
         const photoSection = document.createElement("div");
         photoSection.className = "relative";
-        
+
         // Main photo display
         const mainPhoto = document.createElement("div");
-        mainPhoto.className = "w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden cursor-pointer";
+        mainPhoto.className = "w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden cursor-pointer relative";
         mainPhoto.setAttribute('data-car-id', car.Id);
-        
-        // Check if car has photos
+
+        // Show preview image if available
         if (car.PhotoCount > 0) {
-          // Fetch and display the first photo
-          fetch(`/photo/${car.Id}?first=true`)
-            .then(response => {
-              if (response.ok) {
-                return response.blob();
-              }
-              throw new Error('Photo not found');
-            })
-            .then(blob => {
-              const url = URL.createObjectURL(blob);
-              mainPhoto.innerHTML = `
-                <img src="${url}" alt="Car Photo" class="w-full h-full object-cover">
-                <div class="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                  ${car.PhotoCount} photo${car.PhotoCount > 1 ? 's' : ''}
-                </div>
-              `;
-            })
-            .catch(error => {
-              mainPhoto.innerHTML = `
-                <div class="text-center text-gray-500">
-                  <i class="fas fa-car text-4xl mb-2"></i>
-                  <p>${car.PhotoCount} photo${car.PhotoCount > 1 ? 's' : ''} available</p>
-                  <button class="viewPhotosBtn mt-2 bg-blue-500 text-white px-3 py-1 rounded text-sm" data-car-id="${car.Id}">
-                    View Photos
-                  </button>
-                </div>
-              `;
-            });
+          // Use correct backend route for preview image
+          mainPhoto.innerHTML = `
+            <img src="/photo/car/${car.Id}" alt="Car Photo" class="w-full h-full object-cover" onerror="this.style.display='none';this.parentNode.querySelector('.fallback-photo').style.display='flex';">
+            <div class="fallback-photo text-center text-gray-500 absolute inset-0 items-center justify-center hidden flex-col">
+              <i class="fas fa-camera text-4xl mb-2"></i>
+              <p>No preview available</p>
+            </div>
+            <div class="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+              ${car.PhotoCount} photo${car.PhotoCount > 1 ? 's' : ''}
+            </div>
+          `;
         } else {
           mainPhoto.innerHTML = `
             <div class="text-center text-gray-500">
@@ -163,9 +168,9 @@
               </select>
             </div>
             <div class="mt-2">
-  <label class="font-semibold block text-sm">Customer Phone</label>
-  <input type="tel" value="${car.CustomerPhone || ''}" class="customerPhone border px-2 py-1 rounded w-full text-sm" placeholder="(555) 123-4567">
-</div>
+              <label class="font-semibold block text-sm">Customer Phone</label>
+              <input type="tel" value="${car.CustomerPhone || ''}" class="customerPhone border px-2 py-1 rounded w-full text-sm" placeholder="(555) 123-4567">
+            </div>
             <div>
               <label class="font-semibold block text-sm">Ready for Work</label>
               <select class="readyForWork border rounded px-2 py-1 w-full text-sm">
@@ -193,6 +198,12 @@
             <label class="font-semibold text-sm">Payment Received</label>
           </div>
 
+          <form class="mt-2 flex gap-2 items-center photoUploadForm" enctype="multipart/form-data">
+            <input type="file" name="photo" accept="image/*" multiple class="photoInput border px-2 py-1 rounded text-sm" style="max-width: 180px;" />
+            <button type="submit" class="bg-purple-500 text-white px-3 py-1 rounded text-sm">Add Photo(s)</button>
+            <span class="uploadStatus text-xs text-gray-500"></span>
+          </form>
+
           <div class="mt-4 flex gap-2">
             <button class="updateBtn bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 flex-1">Update</button>
             <button class="viewPhotosBtn bg-green-500 text-white px-3 py-2 rounded-lg hover:bg-green-600 ${car.PhotoCount === 0 ? 'hidden' : ''}" data-car-id="${car.Id}">
@@ -207,6 +218,35 @@
         grid.appendChild(card);
 
         // Add event listeners
+        // Photo upload functionality
+        const photoForm = info.querySelector('.photoUploadForm');
+        const photoInput = info.querySelector('.photoInput');
+        const uploadStatus = info.querySelector('.uploadStatus');
+        if (photoForm && photoInput) {
+          photoForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!photoInput.files.length) {
+              uploadStatus.textContent = 'Select photo(s) first.';
+              return;
+            }
+            const formData = new FormData();
+            for (const file of photoInput.files) {
+              formData.append('photo', file);
+            }
+            uploadStatus.textContent = 'Uploading...';
+            try {
+              const res = await fetch(`/upload-photo/${car.Id}`, {
+                method: 'POST',
+                body: formData
+              });
+              const result = await res.text();
+              uploadStatus.textContent = result;
+              fetchCars(); // refresh
+            } catch (err) {
+              uploadStatus.textContent = 'Upload failed.';
+            }
+          });
+        }
         const updateBtn = info.querySelector(".updateBtn");
         updateBtn.addEventListener("click", async () => {
          // In your dashboard script, update the updateBtn event listener:
@@ -289,17 +329,44 @@ const updatedData = {
     });
 
     // Search/filter
-    document.getElementById("searchInput").addEventListener("input", e => {
-      const query = e.target.value.toLowerCase();
-      const filtered = carsData.filter(car =>
-        (car.Customer && car.Customer.toLowerCase().includes(query)) ||
-        ((car.Make || '').toLowerCase().includes(query)) ||
-        ((car.Model || '').toLowerCase().includes(query)) ||
-        ((car.WorkStatus || '').toLowerCase().includes(query)) ||
-        ((car.VIN || '').toLowerCase().includes(query))
-      );
+    function filterCars() {
+      const query = document.getElementById("searchInput").value.toLowerCase();
+      const status = document.getElementById("statusFilter").value;
+      const make = document.getElementById("makeFilter").value.toLowerCase();
+      const model = document.getElementById("modelFilter").value.toLowerCase();
+      const ready = document.getElementById("readyFilter").checked;
+      const paid = document.getElementById("paymentFilter").checked;
+      const parts = document.getElementById("partsFilter").checked;
+
+      let filtered = carsData.filter(car => {
+        let match = true;
+        if (query) {
+          match = match && (
+            (car.Customer && car.Customer.toLowerCase().includes(query)) ||
+            ((car.Make || '').toLowerCase().includes(query)) ||
+            ((car.Model || '').toLowerCase().includes(query)) ||
+            ((car.WorkStatus || '').toLowerCase().includes(query)) ||
+            ((car.VIN || '').toLowerCase().includes(query))
+          );
+        }
+        if (status) match = match && car.WorkStatus === status;
+        if (make) match = match && (car.Make && car.Make.toLowerCase().includes(make));
+        if (model) match = match && (car.Model && car.Model.toLowerCase().includes(model));
+        if (ready) match = match && car.ReadyForWork === "Yes";
+        if (paid) match = match && car.CustomerPayment;
+        if (parts) match = match && car.PartsOrdered === "Yes";
+        return match;
+      });
       renderCards(filtered);
-    });
+    }
+
+    document.getElementById("searchInput").addEventListener("input", filterCars);
+    document.getElementById("statusFilter").addEventListener("change", filterCars);
+    document.getElementById("makeFilter").addEventListener("input", filterCars);
+    document.getElementById("modelFilter").addEventListener("input", filterCars);
+    document.getElementById("readyFilter").addEventListener("change", filterCars);
+    document.getElementById("paymentFilter").addEventListener("change", filterCars);
+    document.getElementById("partsFilter").addEventListener("change", filterCars);
 
     // Initial fetch
     fetchCars();

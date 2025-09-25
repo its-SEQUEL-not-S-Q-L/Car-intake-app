@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Car Details</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col">
+  <div class="w-full flex justify-center pt-8">
+    <a href="/dashboard.html" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition flex items-center">
+      <i class="fas fa-arrow-left mr-2"></i> Back to Dashboard
+    </a>
+  </div>
+  <main class="p-6 flex flex-col items-center">
+    <section id="carDetails" class="p-6 mb-6 bg-white rounded-xl shadow-lg w-full max-w-2xl">
+      <button id="editPartsBtn" class="bg-yellow-500 text-white font-bold px-4 py-2 rounded-lg hover:bg-yellow-600 transition mb-4"><i class="fas fa-tools mr-2"></i>Edit Parts</button>
+      <div id="photoSlideshow" class="mb-6"></div>
+      <form id="photoUploadForm" class="flex gap-2 mb-6" enctype="multipart/form-data">
+        <input type="file" id="photoInput" name="photos" accept="image/*" capture="environment" multiple class="border px-2 py-1 rounded w-full" style="max-width: 300px;">
+        <button type="submit" class="bg-purple-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-purple-700 transition">Add Photo(s)</button>
+        <span id="uploadStatus" class="text-xs text-gray-500"></span>
+      </form>
+      <h2 class="text-2xl font-bold mb-4">Car Details</h2>
+      <div id="detailsContent"></div>
+      <form id="editCarForm" class="space-y-4"></form>
+      <div id="partsSection" class="mt-6"></div>
+    <div class="flex items-center justify-between mt-6">
+      <div id="partsSection" class=""></div>
+      <button id="togglePartsEditorBtn" class="bg-yellow-500 text-white font-bold px-4 py-2 rounded-lg hover:bg-yellow-600 transition ml-4"><i class="fas fa-tools mr-2"></i>Edit Parts</button>
+    </div>
+    <section id="partsEditor" class="p-6 mb-6 bg-white rounded-xl shadow-lg w-full max-w-2xl" style="display:none;">
+      <h2 class="text-2xl font-bold mb-4">Edit Parts List</h2>
+      <form id="addPartForm" class="flex gap-2 mb-4">
+        <input type="text" name="partName" placeholder="Part name" required class="border px-2 py-1 rounded w-full">
+        <select name="status" class="border px-2 py-1 rounded">
+          <option value="Pending">Not Ordered</option>
+          <option value="Ordered">Ordered</option>
+          <option value="Arrived">Arrived</option>
+          <option value="Customer Provided">Customer Provided</option>
+        </select>
+        <button type="submit" class="bg-green-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-green-700 transition">Add Part</button>
+      </form>
+      <table class="w-full border mb-4">
+        <thead>
+          <tr>
+            <th class="p-2 border">Part Name</th>
+            <th class="p-2 border">Status</th>
+            <th class="p-2 border">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="partsTableBody"></tbody>
+      </table>
+      <span id="partsStatus" class="text-green-600 text-sm"></span>
+    </section>
+    </section>
+  </main>
+  <footer class="bg-gray-800 text-white p-4 text-center">
+    Master Body Shop © 2025
+  </footer>
+  <script>
+  // Photo upload logic
+  document.getElementById('photoUploadForm').onsubmit = async function(e) {
+    e.preventDefault();
+    const input = document.getElementById('photoInput');
+    const status = document.getElementById('uploadStatus');
+    if (!input.files.length) {
+      status.textContent = 'Select photo(s) first.';
+      return;
+    }
+    const formData = new FormData();
+    for (const file of input.files) {
+      formData.append('photo', file);
+    }
+    status.textContent = 'Uploading...';
+    try {
+      const res = await fetch(`/upload-photo/${carId}`, {
+        method: 'POST',
+        body: formData
+      });
+      const result = await res.text();
+      status.textContent = result;
+      fetchCarDetails(); // refresh photos
+    } catch (err) {
+      status.textContent = 'Upload failed.';
+    }
+  };
+  // Toggle parts editor visibility
+  document.addEventListener('DOMContentLoaded', function() {
+    const toggleBtn = document.getElementById('togglePartsEditorBtn');
+    const partsEditor = document.getElementById('partsEditor');
+    if (toggleBtn && partsEditor) {
+      toggleBtn.onclick = function() {
+        partsEditor.style.display = partsEditor.style.display === 'none' ? 'block' : 'none';
+      };
+    }
+  });
+  // --- Car Details and Parts Editor Integration ---
+  const urlParams = new URLSearchParams(window.location.search);
+  const carId = urlParams.get('id');
+  let car = null;
+
+  async function fetchCarDetails() {
+    // Fetch car photos
+    const photosRes = await fetch(`/car/${carId}/photos`);
+    let photos = [];
+    if (photosRes.ok) {
+      photos = await photosRes.json();
+    }
+    const slideshow = document.getElementById('photoSlideshow');
+    if (photos.length > 0) {
+      let slides = photos.map((p, i) => `<img src="${p.PhotoData}" class="w-full h-64 object-contain rounded-lg" style="display:${i === 0 ? 'block' : 'none'}" id="slide${i}">`).join('');
+      let controls = `<div class="flex justify-center gap-2 mt-2">`;
+      for (let i = 0; i < photos.length; i++) {
+        controls += `<button class="px-2 py-1 bg-gray-300 rounded" onclick="showSlide(${i},${photos.length})">${i+1}</button>`;
+      }
+      controls += `</div>`;
+      slideshow.innerHTML = `<h3 class="text-lg font-bold mb-2">Car Photos</h3>${slides}${controls}`;
+    } else {
+      slideshow.innerHTML = `<div class="bg-yellow-100 text-yellow-800 p-4 rounded-lg">No photos available. <b>Please take photos of the car.</b></div>`;
+    }
+
+    window.showSlide = function(idx, total) {
+      for (let i = 0; i < total; i++) {
+        document.getElementById('slide'+i).style.display = i === idx ? 'block' : 'none';
+      }
+    };
+
+    // Fetch car details
+    const res = await fetch(`/car/${carId}`);
+    if (!res.ok) return;
+    car = (await res.json()).data;
+
+    // Render car details (view mode)
+    const detailsContent = document.getElementById('detailsContent');
+    detailsContent.innerHTML = `
+      <div id="carDetailsView">
+        <div><b>Customer:</b> ${car.Customer}</div>
+        <div><b>Year:</b> ${car.Year}</div>
+        <div><b>Make:</b> ${car.Make}</div>
+        <div><b>Model:</b> ${car.Model}</div>
+        <div><b>VIN:</b> ${car.VIN}</div>
+        <div><b>Status:</b> ${car.WorkStatus}</div>
+        <div><b>Notes:</b> ${car.Notes}</div>
+        <div><b>Parts Ordered:</b> ${car.PartsOrdered}</div>
+        <button id="editCarDetailsBtn" class="bg-yellow-500 text-white font-bold px-4 py-2 rounded-lg hover:bg-yellow-600 transition mt-2"><i class="fas fa-edit mr-2"></i>Edit Car Details</button>
+      </div>
+    `;
+
+    // Edit button toggles form
+    document.getElementById('editCarDetailsBtn').onclick = function() {
+      showEditCarForm();
+    };
+
+    // Hide edit form initially
+    document.getElementById('editCarForm').style.display = 'none';
+
+    // Render parts list with Ebay link (read-only)
+    renderPartsList();
+    // Render parts editor (add/edit/delete)
+    fetchParts();
+  }
+
+  function showEditCarForm() {
+    const form = document.getElementById('editCarForm');
+    form.style.display = 'block';
+    document.getElementById('carDetailsView').style.display = 'none';
+    form.innerHTML = `
+      <label class="block"><span>Customer:</span><input type="text" name="Customer" value="${car.Customer}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>Year:</span><input type="number" name="Year" value="${car.Year}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>Make:</span><input type="text" name="Make" value="${car.Make}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>Model:</span><input type="text" name="Model" value="${car.Model}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>VIN:</span><input type="text" name="VIN" value="${car.VIN}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>Status:</span><input type="text" name="WorkStatus" value="${car.WorkStatus}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>Notes:</span><textarea name="Notes" class="border px-2 py-1 rounded w-full">${car.Notes}</textarea></label>
+      <label class="block"><span>Parts Ordered:</span><input type="text" name="PartsOrdered" value="${car.PartsOrdered}" class="border px-2 py-1 rounded w-full"></label>
+      <button type="submit" class="bg-green-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-green-700 transition">Save Changes</button>
+      <button type="button" id="cancelEditCarBtn" class="bg-gray-400 text-white font-bold px-4 py-2 rounded-lg hover:bg-gray-500 transition ml-2">Cancel</button>
+      <span id="editStatus" class="text-green-600 text-sm"></span>
+    `;
+    document.getElementById('cancelEditCarBtn').onclick = function() {
+      form.style.display = 'none';
+      document.getElementById('carDetailsView').style.display = 'block';
+    };
+    form.onsubmit = async function(e) {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form));
+      const res = await fetch(`/car/${carId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      document.getElementById('editStatus').textContent = await res.text();
+      form.style.display = 'none';
+      document.getElementById('carDetailsView').style.display = 'block';
+      fetchCarDetails();
+    };
+  }
+
+  // --- Parts Editor Logic ---
+  async function fetchParts() {
+    const res = await fetch(`/car/${carId}/parts`);
+    if (!res.ok) return;
+    const parts = await res.json();
+    const tbody = document.getElementById('partsTableBody');
+    tbody.innerHTML = '';
+    parts.forEach((part, idx) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="p-2 border">${part.name}</td>
+        <td class="p-2 border">
+          <select data-idx="${idx}" class="statusSelect border rounded px-2 py-1">
+            <option value="Pending" ${part.status === 'Pending' ? 'selected' : ''}>Not Ordered</option>
+            <option value="Ordered" ${part.status === 'Ordered' ? 'selected' : ''}>Ordered</option>
+            <option value="Arrived" ${part.status === 'Arrived' ? 'selected' : ''}>Arrived</option>
+            <option value="Customer Provided" ${part.status === 'Customer Provided' ? 'selected' : ''}>Customer Provided</option>
+          </select>
+        </td>
+        <td class="p-2 border">
+          <button data-idx="${idx}" class="deletePartBtn bg-red-500 text-white px-2 py-1 rounded">Delete</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+    document.querySelectorAll('.statusSelect').forEach(sel => {
+      sel.onchange = async function() {
+        const idx = sel.getAttribute('data-idx');
+        const status = sel.value;
+        await fetch(`/car/${carId}/parts`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idx, status })
+        });
+        fetchParts();
+      };
+    });
+    document.querySelectorAll('.deletePartBtn').forEach(btn => {
+      btn.onclick = async function() {
+        const idx = btn.getAttribute('data-idx');
+        await fetch(`/car/${carId}/parts`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idx })
+        });
+        fetchParts();
+      };
+    });
+  }
+  document.getElementById('addPartForm').onsubmit = async function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const partName = form.partName.value;
+    const status = form.status.value;
+    await fetch(`/car/${carId}/parts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ partName, status })
+    });
+    form.reset();
+    fetchParts();
+  };
+
+  // Render parts list with Ebay link (read-only)
+  function renderPartsList() {
+    fetch(`/car/${carId}/parts`).then(res => res.ok ? res.json() : []).then(parts => {
+      const partsSection = document.getElementById('partsSection');
+      if (parts.length > 0) {
+        partsSection.innerHTML = `
+          <h3 class="text-lg font-bold mb-2">Parts List</h3>
+          <table class="w-full border mb-4">
+            <thead>
+              <tr>
+                <th class="p-2 border">Part Name</th>
+                <th class="p-2 border">Status</th>
+                <th class="p-2 border">Ebay Search</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${parts.map(part => `
+                <tr>
+                  <td class="p-2 border">${part.name}</td>
+                  <td class="p-2 border">${part.status}</td>
+                  <td class="p-2 border">
+                    <a href="https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(`${car.Year} ${car.Make} ${car.Model} ${part.name}`)}" target="_blank" class="text-blue-600 underline">Search Ebay</a>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } else {
+        partsSection.innerHTML = `<div class="bg-yellow-100 text-yellow-800 p-4 rounded-lg">No parts listed for this car.</div>`;
+      }
+    });
+  }
+
+  fetchCarDetails();
+  </script>
+</body>
+</html>
