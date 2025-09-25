@@ -1,4 +1,5 @@
 
+
 const express = require("express");
 const sql = require("mssql");
 const path = require("path");
@@ -9,6 +10,132 @@ require('dotenv').config();
 const session = require('express-session');
 
 const app = express();
+// Update car details (POST for compatibility)
+app.post('/car/:id', express.json(), async (req, res) => {
+  try {
+    const carId = req.params.id;
+    // Accept any field for update, normalize keys
+    const allowedFields = {
+      notes: 'Notes',
+      workStatus: 'WorkStatus',
+      readyForWork: 'ReadyForWork',
+      partsOrdered: 'PartsOrdered',
+      customerPayment: 'CustomerPayment',
+      customerPhone: 'CustomerPhone',
+      customerCarrier: 'CustomerCarrier',
+      year: 'Year',
+      make: 'Make',
+      model: 'Model',
+      color: 'COLOR',
+      vin: 'VIN'
+    };
+    const updateFields = [];
+    for (const key in req.body) {
+      if (allowedFields[key]) {
+        const value = req.body[key];
+        if (typeof value !== 'undefined' && value !== null && value !== '' && value !== 'null') {
+          updateFields.push(`${allowedFields[key]} = @${allowedFields[key]}`);
+        }
+      }
+    }
+    // If only notes is present, allow notes-only update
+    if (updateFields.length === 0 && typeof req.body.notes !== 'undefined' && req.body.notes !== null && req.body.notes !== '') {
+      let author = (req.session && req.session.user && req.session.user.username) ? req.session.user.username : 'Unknown';
+      await pool.request()
+        .input('CarId', sql.Int, carId)
+        .input('Author', sql.NVarChar, author)
+        .input('Comment', sql.NVarChar, req.body.notes)
+        .query('INSERT INTO CarNotes (CarId, Author, Comment) VALUES (@CarId, @Author, @Comment)');
+      return res.json({ success: true, message: 'Note added as comment' });
+    }
+    if (updateFields.length === 0) return res.status(400).json({ success: false, message: 'No fields to update' });
+    const updateQuery = `UPDATE Cars SET ${updateFields.join(', ')} WHERE Id = @Id`;
+    const updateRequest = pool.request().input('Id', sql.Int, carId);
+    for (const key in req.body) {
+      if (allowedFields[key]) {
+        if (allowedFields[key] === 'CustomerPayment') {
+          // Accept 1, 0, '1', '0', true, false
+          let val = req.body[key];
+          if (typeof val === 'string') val = val === '1' ? 1 : 0;
+          if (typeof val === 'boolean') val = val ? 1 : 0;
+          updateRequest.input('CustomerPayment', sql.Bit, val);
+        } else {
+          updateRequest.input(allowedFields[key], sql.NVarChar, req.body[key]);
+        }
+      }
+    }
+    await updateRequest.query(updateQuery);
+    // If notes is present, also add to CarNotes with author from session if available
+    if (typeof req.body.notes !== 'undefined' && req.body.notes !== null && req.body.notes !== '') {
+      let author = (req.session && req.session.user && req.session.user.username) ? req.session.user.username : 'Unknown';
+      await pool.request()
+        .input('CarId', sql.Int, carId)
+        .input('Author', sql.NVarChar, author)
+        .input('Comment', sql.NVarChar, req.body.notes)
+        .query('INSERT INTO CarNotes (CarId, Author, Comment) VALUES (@CarId, @Author, @Comment)');
+    }
+    res.json({ success: true, message: 'Car details updated' });
+
+    // ...existing code...
+  } catch (err) {
+    console.error('❌ Error updating car details:', err);
+    res.status(500).json({ success: false, message: 'Error updating car details', error: err.message });
+  }
+});
+
+// --- Car Notes/Comments Endpoints ---
+// Ensure CarNotes table exists (run this in DB):
+// CREATE TABLE CarNotes (
+//   Id INT IDENTITY(1,1) PRIMARY KEY,
+//   CarId INT NOT NULL,
+//   Author NVARCHAR(100) NOT NULL,
+//   Comment NVARCHAR(MAX) NOT NULL,
+//   Timestamp DATETIME DEFAULT GETDATE(),
+//   FOREIGN KEY (CarId) REFERENCES Cars(Id)
+// );
+
+// Get all notes/comments for a car
+app.get('/car/:id/notes', async (req, res) => {
+  try {
+    const carId = req.params.id;
+    const result = await pool.request()
+      .input('CarId', sql.Int, carId)
+      .query('SELECT Author, Comment, Timestamp FROM CarNotes WHERE CarId = @CarId ORDER BY Timestamp DESC');
+    res.json({ success: true, notes: result.recordset });
+  } catch (err) {
+    console.error('❌ Error fetching car notes:', err);
+    res.status(500).json({ success: false, message: 'Error fetching car notes', error: err.message });
+  }
+});
+
+// Add a new comment/note to a car
+app.post('/car/:id/notes', express.json(), async (req, res) => {
+  try {
+    const carId = req.params.id;
+    let author = req.body.author;
+    let comment = req.body.comment;
+    // Support {note: "..."} payload, use session user as author if available
+    if (!comment && req.body.note) {
+      comment = req.body.note;
+    }
+    // Always use session user if available and payload author is empty
+    if ((!author || author.trim() === '') && req.session && req.session.user && req.session.user.username) {
+      author = req.session.user.username;
+    }
+    if (!author || !comment) return res.status(400).json({ success: false, message: 'Missing author or comment' });
+    await pool.request()
+      .input('CarId', sql.Int, carId)
+      .input('Author', sql.NVarChar, author)
+      .input('Comment', sql.NVarChar, comment)
+      .query('INSERT INTO CarNotes (CarId, Author, Comment) VALUES (@CarId, @Author, @Comment)');
+    res.json({ success: true, message: 'Comment added' });
+  } catch (err) {
+    console.error('❌ Error adding car note:', err);
+    res.status(500).json({ success: false, message: 'Error adding car note', error: err.message });
+  }
+});
+
+
 
 // Multer setup for photo uploads
 const multer = require('multer');
@@ -38,7 +165,8 @@ app.post('/upload-photo/:carId', upload.array('photo'), async (req, res) => {
 // Increase payload size limit for base64 images
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'views')));
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'bodyshop_secret',
@@ -162,7 +290,9 @@ async function initializeApp() {
 app.post('/login', express.json(), async (req, res) => {
   const { username, password } = req.body;
   if (!username || !password) return res.status(400).send('Missing credentials');
+  let pool;
   try {
+    pool = await sql.connect(dbConfig);
     const result = await pool.request()
       .input('Username', sql.NVarChar, username)
       .query('SELECT * FROM Users WHERE Username = @Username');
@@ -174,13 +304,17 @@ app.post('/login', express.json(), async (req, res) => {
     res.send('success');
   } catch (err) {
     res.status(500).send('Login error');
+  } finally {
+    if (pool) await pool.close();
   }
 });
 
 app.post('/register', express.json(), async (req, res) => {
   const { username, password, role = 'technician' } = req.body;
   if (!username || !password) return res.status(400).send('Missing credentials');
+  let pool;
   try {
+    pool = await sql.connect(dbConfig);
     const exists = await pool.request()
       .input('Username', sql.NVarChar, username)
       .query('SELECT * FROM Users WHERE Username = @Username');
@@ -194,6 +328,8 @@ app.post('/register', express.json(), async (req, res) => {
     res.send('User registered');
   } catch (err) {
     res.status(500).send('Registration error');
+  } finally {
+    if (pool) await pool.close();
   }
 });
 
@@ -335,6 +471,13 @@ Thank you for choosing Master Body Shop!
 }
 
 // Enhanced intake route with phone number and carrier support
+// Alias for car intake
+app.post("/intake", async (req, res) => {
+  // Reuse the /add-car handler
+  req.url = "/add-car";
+  app._router.handle(req, res);
+});
+
 app.post("/add-car", async (req, res) => {
   const transaction = new sql.Transaction(pool);
   
@@ -730,6 +873,44 @@ app.get("/dashboard", requireAuth, async (req, res) => {
   try {
     pool = await sql.connect(dbConfig);
     
+    let whereClauses = [];
+    let request = pool.request();
+
+    if (req.query.id) {
+      request.input('id', sql.Int, req.query.id);
+      whereClauses.push('c.Id = @id');
+    }
+    if (req.query.status) {
+      request.input('status', sql.NVarChar, req.query.status);
+      whereClauses.push('c.WorkStatus = @status');
+    }
+    if (req.query.customer) {
+      request.input('customer', sql.NVarChar, `%${req.query.customer}%`);
+      whereClauses.push('c.Customer LIKE @customer');
+    }
+    if (req.query.make) {
+      request.input('make', sql.NVarChar, `%${req.query.make}%`);
+      whereClauses.push('c.Make LIKE @make');
+    }
+    if (req.query.model) {
+      request.input('model', sql.NVarChar, `%${req.query.model}%`);
+      whereClauses.push('c.Model LIKE @model');
+    }
+    if (req.query.vin) {
+      request.input('vin', sql.NVarChar, `%${req.query.vin}%`);
+      whereClauses.push('c.VIN LIKE @vin');
+    }
+
+    // If archived=1, only show archived cars (Completed and Paid)
+    if (req.query.archived === '1') {
+      whereClauses.push("c.WorkStatus = 'Completed' AND c.CustomerPayment = 1");
+    } else {
+      // Exclude archived cars for all other dashboards
+      whereClauses.push("NOT (c.WorkStatus = 'Completed' AND c.CustomerPayment = 1)");
+    }
+
+    let whereSQL = whereClauses.length > 0 ? ('WHERE ' + whereClauses.join(' AND ')) : '';
+
     if (req.query.id) {
       const result = await pool.request()
         .input('id', sql.Int, req.query.id)
@@ -742,14 +923,13 @@ app.get("/dashboard", requireAuth, async (req, res) => {
       return res.json(result.recordset[0]);
     }
 
-    const result = await pool.request().query(`
+    const result = await request.query(`
       SELECT c.*, 
              (SELECT COUNT(*) FROM CarPhotos WHERE CarId = c.Id) as PhotoCount
       FROM Cars c
       ${whereSQL}
       ORDER BY c.ArrivalDate DESC
     `);
-    
     res.json(result.recordset);
   } catch (err) {
     console.error("❌ Database error:", err);
@@ -806,8 +986,12 @@ app.post("/send-sms/:carId", async (req, res) => {
 });
 
 // Get available carriers
+// Serve car-details.html
+app.get('/car-details.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'views', 'car-details.html'));
+});
 // Photo upload for a specific car
-const multer = require('multer');
+
 
 
 app.post('/upload-photo/:id', upload.single('photo'), async (req, res) => {
@@ -868,4 +1052,11 @@ app.get("/admin-dashboard.html", requireAuth, (req, res) => {
 });
 
 const PORT = 3030;
-app.listen(PORT, () => console.log(`🚗 Server running on http://localhost:${PORT} (FREE SMS Enabled)`));
+
+// Start server only after DB pool is initialized
+initializeApp().then(() => {
+  app.listen(PORT, () => console.log(`🚗 Server running on http://localhost:${PORT} (FREE SMS Enabled)`));
+}).catch(err => {
+  console.error('❌ Failed to initialize app:', err);
+  process.exit(1);
+});

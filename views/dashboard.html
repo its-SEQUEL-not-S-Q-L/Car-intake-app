@@ -13,12 +13,24 @@
       <a href="/welcome.html" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition flex items-center">
         <i class="fas fa-home mr-2"></i> Home
       </a>
-      <a href="/dashboard.html" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center">
-        <i class="fas fa-tachometer-alt mr-2"></i> View Dashboard
+      <a href="/dashboard-inprogress.html" class="bg-yellow-400 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-500 transition flex items-center">
+        <i class="fas fa-spinner mr-2"></i> In Progress
       </a>
-        <a id="adminDashBtn" href="/admin-dashboard.html" style="display:none" class="bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-700 transition flex items-center">
-          <i class="fas fa-user-shield mr-2"></i> Admin Dashboard
-        </a>
+      <a href="/dashboard-received.html" class="bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-500 transition flex items-center">
+        <i class="fas fa-inbox mr-2"></i> Received
+      </a>
+      <a href="/dashboard-completed.html" class="bg-green-400 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-500 transition flex items-center">
+        <i class="fas fa-check-circle mr-2"></i> Completed (Not Paid)
+      </a>
+      <a href="/dashboard-archived.html" class="bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-800 transition flex items-center">
+        <i class="fas fa-archive mr-2"></i> Archived
+      </a>
+      <a href="/dashboard.html" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center">
+        <i class="fas fa-tachometer-alt mr-2"></i> All Cars
+      </a>
+      <a id="adminDashBtn" href="/admin-dashboard.html" style="display:none" class="bg-yellow-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-700 transition flex items-center">
+        <i class="fas fa-user-shield mr-2"></i> Admin Dashboard
+      </a>
       <button type="button" id="logoutBtn" class="bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition flex items-center">
         <i class="fas fa-sign-out-alt mr-2"></i> Logout
       </button>
@@ -64,9 +76,14 @@
 
   <!-- Cards Grid -->
   <main id="carsGrid" class="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 flex-grow" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:24px;">
-  <!-- Admin User Management Section -->
-  <section id="adminUserMgmt" class="p-6 mb-6 bg-white rounded-xl shadow-lg" style="display:none;">
-    <h2 class="text-2xl font-bold mb-4">User & Role Management</h2>
+    <h1 class="text-3xl font-bold mb-6">Car Dashboard</h1>
+    <div id="dashboardTabs" class="flex gap-4 mb-6">
+      <button class="tabBtn bg-blue-100 px-4 py-2 rounded" data-tab="inprogress">In Progress</button>
+      <button class="tabBtn bg-yellow-100 px-4 py-2 rounded" data-tab="received">Received</button>
+      <button class="tabBtn bg-green-100 px-4 py-2 rounded" data-tab="completed">Completed (Not Paid)</button>
+      <button class="tabBtn bg-gray-200 px-4 py-2 rounded" data-tab="archived">Archived</button>
+    </div>
+    <div id="dashboardCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
     <table class="w-full text-left border">
       <thead>
         <tr>
@@ -174,11 +191,11 @@
     let carsData = [];
 
     async function fetchCars() {
-  const res = await fetch("/dashboard");
-  const result = await res.json();
-  carsData = result.data || [];
-  console.log(`[DEBUG] Cars received from backend:`, carsData.length, carsData);
-  renderCards(carsData);
+      const res = await fetch("/dashboard");
+      const response = await res.json();
+      carsData = Array.isArray(response) ? response : response.data || [];
+      console.log(`[DEBUG] Cars received from backend:`, carsData.length, carsData);
+      renderCards(carsData);
     }
 
     async function fetchCarPhotos(carId) {
@@ -204,7 +221,22 @@
       cars.forEach((car, idx) => {
         console.log(`[DEBUG] Rendering car #${idx + 1}:`, car);
         const card = document.createElement("div");
-        card.className = "bg-white rounded-2xl shadow-lg p-5 flex flex-col gap-4 hover:shadow-2xl transition cursor-pointer";
+        let statusColor = "bg-white";
+        switch (car.WorkStatus) {
+          case "Completed":
+            statusColor = "bg-green-100";
+            break;
+          case "In Progress":
+            statusColor = "bg-yellow-100";
+            break;
+          case "Waiting on Parts":
+            statusColor = "bg-blue-100";
+            break;
+          case "Received":
+            statusColor = "bg-gray-100";
+            break;
+        }
+        card.className = `${statusColor} rounded-2xl shadow-lg p-5 flex flex-col gap-4 hover:shadow-2xl transition cursor-pointer`;
         card.onclick = () => {
           window.location.href = `/car-details.html?id=${car.Id}`;
         };

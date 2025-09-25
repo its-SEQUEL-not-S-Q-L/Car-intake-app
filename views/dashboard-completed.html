@@ -1,0 +1,109 @@
+<!-- Completed (Not Paid) Dashboard -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Completed Cars (Not Paid)</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 text-gray-900 min-h-screen flex flex-col">
+  <div class="w-full flex justify-center pt-8">
+    <div class="flex gap-4">
+      <a href="/dashboard-inprogress.html" class="bg-yellow-400 text-white font-semibold py-2 px-4 rounded-lg hover:bg-yellow-500 transition flex items-center"><i class="fas fa-spinner mr-2"></i> In Progress</a>
+      <a href="/dashboard-received.html" class="bg-gray-400 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-500 transition flex items-center"><i class="fas fa-inbox mr-2"></i> Received</a>
+      <a href="/dashboard-completed.html" class="bg-green-400 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-500 transition flex items-center"><i class="fas fa-check-circle mr-2"></i> Completed (Not Paid)</a>
+      <a href="/dashboard-archived.html" class="bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-800 transition flex items-center"><i class="fas fa-archive mr-2"></i> Archived</a>
+      <a href="/dashboard.html" class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center"><i class="fas fa-tachometer-alt mr-2"></i> All Cars</a>
+    </div>
+  </div>
+  <main class="p-6">
+    <h1 class="text-3xl font-bold mb-6">Completed Cars (Not Paid)</h1>
+    <div id="dashboardCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+  </main>
+  <script>
+    async function fetchCars() {
+      const res = await fetch('/dashboard');
+      const cars = await res.json();
+      const filtered = cars.filter(car => car.WorkStatus === 'Completed' && !car.CustomerPayment);
+      renderCards(filtered);
+    }
+    function renderCards(cars) {
+      const cards = document.getElementById('dashboardCards');
+      cards.innerHTML = '';
+      cars.forEach(car => {
+        let statusColor = "bg-white";
+        switch (car.WorkStatus) {
+          case "Completed": statusColor = "bg-green-100"; break;
+          case "In Progress": statusColor = "bg-yellow-100"; break;
+          case "Waiting on Parts": statusColor = "bg-blue-100"; break;
+          case "Received": statusColor = "bg-gray-100"; break;
+        }
+        const card = document.createElement('div');
+        card.className = `${statusColor} rounded-2xl shadow-lg p-5 flex flex-col gap-4 hover:shadow-2xl transition cursor-pointer`;
+        card.onclick = () => window.location.href = `/car-details.html?id=${car.Id}`;
+        // Photo section
+        const photoSection = document.createElement('div');
+        photoSection.className = 'relative';
+        const mainPhoto = document.createElement('div');
+        mainPhoto.className = 'w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center overflow-hidden cursor-pointer relative';
+        mainPhoto.setAttribute('data-car-id', car.Id);
+        if (car.PhotoCount > 0) {
+          mainPhoto.innerHTML = `
+            <img src="/photo/car/${car.Id}" alt="Car Photo" class="w-full h-full object-cover" onerror="this.style.display='none';this.parentNode.querySelector('.fallback-photo').style.display='flex';">
+            <div class="fallback-photo text-center text-gray-500 absolute inset-0 items-center justify-center hidden flex-col">
+              <i class="fas fa-camera text-4xl mb-2"></i>
+              <p>No preview available</p>
+            </div>
+            <div class="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+              ${car.PhotoCount} photo${car.PhotoCount > 1 ? 's' : ''}
+            </div>
+          `;
+        } else {
+          mainPhoto.innerHTML = `
+            <div class="text-center text-gray-500">
+              <i class="fas fa-camera text-4xl mb-2"></i>
+              <p>No photos</p>
+            </div>
+          `;
+        }
+        photoSection.appendChild(mainPhoto);
+        // Car info section
+        const info = document.createElement('div');
+        info.className = 'flex-1';
+        info.innerHTML = `
+          <h2 class="text-lg font-bold mb-2">${car.Year || ''} ${car.Make || ''} ${car.Model || ''}</h2>
+          <p><span class="font-semibold">Customer:</span> ${car.Customer || ''}</p>
+          <p><span class="font-semibold">VIN:</span> ${car.VIN || 'N/A'}</p>
+          <p class="flex items-center"><span class="font-semibold">Color:</span> 
+            ${car.Color ? `
+              <span class="ml-1 inline-flex items-center">
+                <span class="inline-block w-4 h-4 rounded-full border mr-1" style="background:${car.Color.toLowerCase()}"></span>
+                ${car.Color}
+              </span>
+            ` : 'N/A'}
+          </p>
+          <p><span class="font-semibold">Arrival:</span> ${new Date(car.ArrivalDate).toLocaleDateString()}</p>
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <div>
+              <label class="font-semibold block text-sm">Status</label>
+              <span class="block px-2 py-1 rounded w-full text-sm bg-gray-100">${car.WorkStatus || ''}</span>
+            </div>
+            <div>
+              <label class="font-semibold block text-sm">Customer Phone</label>
+              <span class="block px-2 py-1 rounded w-full text-sm bg-gray-100">${car.CustomerPhone || ''}</span>
+            </div>
+            <div>
+              <label class="font-semibold block text-sm">Ready for Work</label>
+              <span class="block px-2 py-1 rounded w-full text-sm bg-gray-100">${car.ReadyForWork || ''}</span>
+            </div>
+          </div>
+        `;
+        card.appendChild(photoSection);
+        card.appendChild(info);
+        cards.appendChild(card);
+      });
+    }
+    fetchCars();
+  </script>
+</body>
+</html>

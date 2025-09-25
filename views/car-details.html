@@ -14,7 +14,6 @@
   </div>
   <main class="p-6 flex flex-col items-center">
     <section id="carDetails" class="p-6 mb-6 bg-white rounded-xl shadow-lg w-full max-w-2xl">
-      <button id="editPartsBtn" class="bg-yellow-500 text-white font-bold px-4 py-2 rounded-lg hover:bg-yellow-600 transition mb-4"><i class="fas fa-tools mr-2"></i>Edit Parts</button>
       <div id="photoSlideshow" class="mb-6"></div>
       <form id="photoUploadForm" class="flex gap-2 mb-6" enctype="multipart/form-data">
         <input type="file" id="photoInput" name="photos" accept="image/*" capture="environment" multiple class="border px-2 py-1 rounded w-full" style="max-width: 300px;">
@@ -59,21 +58,28 @@
   <footer class="bg-gray-800 text-white p-4 text-center">
     Master Body Shop © 2025
   </footer>
+  <script src="/get-user.js"></script>
   <script>
   // --- Notes Section ---
   async function fetchNotes() {
     const res = await fetch(`/car/${carId}/notes`, { credentials: 'include' });
     if (!res.ok) return;
-    const notes = await res.json();
+    const notesData = await res.json();
     const notesSection = document.getElementById('notesSection');
+    const notes = notesData.notes || [];
     if (notes.length > 0) {
       notesSection.innerHTML = `
-        <h3 class="text-lg font-bold mb-2">Notes</h3>
+        <h3 class="text-lg font-bold mb-2">Comments</h3>
         <div class="space-y-2 mb-4">
           ${notes.map(note => `
-            <div class="bg-gray-100 rounded-lg p-3">
-              <div class="text-sm text-gray-700">${note.Note}</div>
-              <div class="text-xs text-gray-500 mt-1">By <b>${note.Username}</b> on ${new Date(note.Timestamp).toLocaleString()}</div>
+            <div class="flex items-start gap-3 bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div class="flex-shrink-0 w-10 h-10 bg-blue-200 rounded-full flex items-center justify-center text-lg font-bold text-blue-700">
+                ${(note.Author || note.Username || '?').charAt(0).toUpperCase()}
+              </div>
+              <div class="flex-1">
+                <div class="text-sm text-gray-800">${note.Comment}</div>
+                <div class="text-xs text-gray-500 mt-1">By <b>${note.Author || note.Username}</b> on ${new Date(note.Timestamp).toLocaleString()}</div>
+              </div>
             </div>
           `).join('')}
         </div>
@@ -93,15 +99,27 @@
       e.preventDefault();
       const form = e.target;
       const note = form.note.value;
+      // Wait for get-user.js to set window.currentUser
+      let author = '';
+      if (window.sessionStorage && sessionStorage.getItem('username')) {
+        author = sessionStorage.getItem('username');
+      } else if (window.currentUser) {
+        author = window.currentUser;
+      }
+      if (!author) {
+        document.getElementById('noteStatus').textContent = 'Error: Could not determine logged-in user.';
+        return;
+      }
+      const payload = { author, comment: note };
       const res = await fetch(`/car/${carId}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note }),
+        body: JSON.stringify(payload),
         credentials: 'include'
       });
       document.getElementById('noteStatus').textContent = await res.text();
-      form.reset();
-      fetchNotes();
+  form.reset();
+  fetchCarDetails();
     };
   }
   // Photo upload logic
@@ -125,7 +143,7 @@
       });
       const result = await res.text();
       status.textContent = result;
-      fetchCarDetails(); // refresh photos
+  fetchCarDetails(); // refresh everything
     } catch (err) {
       status.textContent = 'Upload failed.';
     }
@@ -187,7 +205,6 @@
         <div><b>Model:</b> ${car.Model}</div>
         <div><b>VIN:</b> ${car.VIN}</div>
         <div><b>Status:</b> ${car.WorkStatus}</div>
-        <div><b>Notes:</b> ${car.Notes}</div>
         <div><b>Parts Ordered:</b> ${car.PartsOrdered}</div>
         <button id="editCarDetailsBtn" class="bg-yellow-500 text-white font-bold px-4 py-2 rounded-lg hover:bg-yellow-600 transition mt-2"><i class="fas fa-edit mr-2"></i>Edit Car Details</button>
       </div>
@@ -212,14 +229,22 @@
     form.style.display = 'block';
     document.getElementById('carDetailsView').style.display = 'none';
     form.innerHTML = `
-      <label class="block"><span>Customer:</span><input type="text" name="Customer" value="${car.Customer}" class="border px-2 py-1 rounded w-full"></label>
-      <label class="block"><span>Year:</span><input type="number" name="Year" value="${car.Year}" class="border px-2 py-1 rounded w-full"></label>
-      <label class="block"><span>Make:</span><input type="text" name="Make" value="${car.Make}" class="border px-2 py-1 rounded w-full"></label>
-      <label class="block"><span>Model:</span><input type="text" name="Model" value="${car.Model}" class="border px-2 py-1 rounded w-full"></label>
-      <label class="block"><span>VIN:</span><input type="text" name="VIN" value="${car.VIN}" class="border px-2 py-1 rounded w-full"></label>
-      <label class="block"><span>Status:</span><input type="text" name="WorkStatus" value="${car.WorkStatus}" class="border px-2 py-1 rounded w-full"></label>
-      <label class="block"><span>Notes:</span><textarea name="Notes" class="border px-2 py-1 rounded w-full">${car.Notes}</textarea></label>
-      <label class="block"><span>Parts Ordered:</span><input type="text" name="PartsOrdered" value="${car.PartsOrdered}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>Customer:</span><input type="text" name="customer" value="${car.Customer}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>Year:</span><input type="number" name="year" value="${car.Year}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>Make:</span><input type="text" name="make" value="${car.Make}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>Model:</span><input type="text" name="model" value="${car.Model}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>VIN:</span><input type="text" name="vin" value="${car.VIN}" class="border px-2 py-1 rounded w-full"></label>
+      <label class="block"><span>Status:</span>
+        <select name="workStatus" class="border px-2 py-1 rounded w-full">
+          <option value="Received" ${car.WorkStatus === "Received" ? "selected" : ""}>Received</option>
+          <option value="In Progress" ${car.WorkStatus === "In Progress" ? "selected" : ""}>In Progress</option>
+          <option value="Waiting on Parts" ${car.WorkStatus === "Waiting on Parts" ? "selected" : ""}>Waiting on Parts</option>
+          <option value="Completed" ${car.WorkStatus === "Completed" ? "selected" : ""}>Completed</option>
+        </select>
+      </label>
+      <label class="block"><span>Payment Received:</span>
+        <input type="checkbox" name="customerPayment" value="1" ${car.CustomerPayment ? 'checked' : ''} class="ml-2">
+      </label>
       <button type="submit" class="bg-green-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-green-700 transition">Save Changes</button>
       <button type="button" id="cancelEditCarBtn" class="bg-gray-400 text-white font-bold px-4 py-2 rounded-lg hover:bg-gray-500 transition ml-2">Cancel</button>
       <span id="editStatus" class="text-green-600 text-sm"></span>
@@ -230,7 +255,18 @@
     };
     form.onsubmit = async function(e) {
       e.preventDefault();
-      const data = Object.fromEntries(new FormData(form));
+      const formData = new FormData(form);
+      const data = {};
+      for (const [key, value] of formData.entries()) {
+        // Only send fields that are changed and not empty/null
+        if (key === 'customerPayment') {
+          // Checkbox: send 1 if checked, 0 if not
+          data.customerPayment = form.customerPayment.checked ? 1 : 0;
+        } else if (value !== '' && value !== null && value !== 'null' && value !== car[key]) {
+          data[key] = value;
+        }
+      }
+      // Always include car id in the URL
       const res = await fetch(`/car/${carId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

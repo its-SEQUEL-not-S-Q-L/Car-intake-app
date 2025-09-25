@@ -13,3 +13,26 @@ CREATE TABLE Cars (
     Status NVARCHAR(50) NOT NULL,
     CreatedAt DATETIME DEFAULT GETDATE()
 );
+
+-- USERS TABLE
+CREATE TABLE [dbo].[Users] (
+    [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    [Username] NVARCHAR(100) NOT NULL UNIQUE,
+    [PasswordHash] NVARCHAR(256) NOT NULL,
+    [Email] NVARCHAR(100) NULL,
+    [Role] NVARCHAR(50) NULL,
+    [IsActive] BIT NOT NULL DEFAULT 1,
+    [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE()
+);
+
+-- AUDIT LOG TABLE
+CREATE TABLE [dbo].[AuditLog] (
+    [Id] INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    [UserId] INT NULL,
+    [Action] NVARCHAR(100) NOT NULL,
+    [TableName] NVARCHAR(100) NULL,
+    [RecordId] INT NULL,
+    [Details] NVARCHAR(MAX) NULL,
+    [Timestamp] DATETIME NOT NULL DEFAULT GETDATE(),
+    FOREIGN KEY ([UserId]) REFERENCES [dbo].[Users]([Id])
+);
