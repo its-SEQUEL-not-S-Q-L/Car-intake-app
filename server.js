@@ -3,14 +3,49 @@ const express = require("express");
 const sql = require("mssql");
 const path = require("path");
 const nodemailer = require('nodemailer');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
+const session = require('express-session');
+
 const app = express();
+
+// Multer setup for photo uploads
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Photo upload endpoint for car details page
+app.post('/upload-photo/:carId', upload.array('photo'), async (req, res) => {
+  try {
+    const carId = parseInt(req.params.carId);
+    if (!carId || !req.files || req.files.length === 0) {
+      return res.status(400).send('No files uploaded');
+    }
+    for (const file of req.files) {
+      const photoData = file.buffer.toString('base64');
+      await pool.request()
+        .input('CarId', sql.Int, carId)
+        .input('PhotoData', sql.VarChar(sql.MAX), `data:${file.mimetype};base64,${photoData}`)
+        .query('INSERT INTO CarPhotos (CarId, PhotoData, Timestamp) VALUES (@CarId, @PhotoData, GETDATE())');
+    }
+    res.send('Photo(s) uploaded successfully');
+  } catch (err) {
+    console.error('❌ Photo upload error:', err);
+    res.status(500).send('❌ Error uploading photo(s)');
+  }
+});
 
 // Increase payload size limit for base64 images
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static("public"));
+
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'bodyshop_secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }
+}));
 
 // SQL Server config
 const dbConfig = {
@@ -20,13 +55,57 @@ const dbConfig = {
   database: "BodyshopDB",
   options: {
     encrypt: false,
-    trustServerCertificate: true
+    trustServerCertificate: true,
+    enableArithAbort: true,
+    connectionTimeout: 30000,
+    requestTimeout: 30000,
+    pool: {
+      max: 10,
+      min: 0,
+      idleTimeoutMillis: 30000
+    }
   }
 };
 
+// Global connection pool
+let pool;
+async function initializePool() {
+  try {
+    pool = await sql.connect(dbConfig);
+    pool.on('error', err => {
+      console.error('Database pool error:', err);
+    });
+    console.log("✅ Database connection pool established");
+    return pool;
+  } catch (err) {
+    console.error("❌ Database connection failed:", err);
+    process.exit(1);
+  }
+}
+
+// --- Middleware ---
+function requireLogin(req, res, next) {
+  if (!req.session.user) {
+    return res.status(401).json({ success: false, message: 'Not logged in' });
+  }
+  next();
+}
+function requireAdmin(req, res, next) {
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ success: false, message: 'Admin only' });
+  }
+  next();
+}
+function requireAuth(req, res, next) {
+  if (req.session && req.session.user) {
+    return next();
+  }
+  res.redirect('/');
+}
+
 // Email configuration for FREE Email-to-SMS
 const emailTransporter = nodemailer.createTransport({
-  service: 'gmail', // You can use 'outlook', 'yahoo', etc.
+  service: 'gmail',
   auth: {
     user: process.env.EMAIL_USER || 'yousseflteif@gmail.com',
     pass: process.env.EMAIL_PASS || 'uatyeyxstzjmzqwr'
@@ -45,54 +124,126 @@ const carrierGateways = {
   'uscellular': '@email.uscc.net'
 };
 
-// Initialize database connection and create tables if needed
+// Initialize database tables if needed
 async function initializeDatabase() {
   try {
-    const pool = await sql.connect(dbConfig);
-    
-    // Create CarPhotos table if it doesn't exist
-    await pool.request().query(`
-      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='CarPhotos' AND xtype='U')
-      CREATE TABLE CarPhotos (
-        Id INT IDENTITY(1,1) PRIMARY KEY,
-        CarId INT NOT NULL,
-        PhotoData TEXT NOT NULL,
-        Timestamp NVARCHAR(50) NOT NULL,
-        CreatedAt DATETIME DEFAULT GETDATE(),
-        FOREIGN KEY (CarId) REFERENCES Cars(Id) ON DELETE CASCADE
-      )
-    `);
-    
-    // Add CustomerPhone column if it doesn't exist
+    // Verify Cars table structure
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS 
                      WHERE TABLE_NAME='Cars' AND COLUMN_NAME='CustomerPhone')
       ALTER TABLE Cars ADD CustomerPhone NVARCHAR(20) NULL
     `);
     
-    // Add SMSNotificationSent column if it doesn't exist
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS 
                      WHERE TABLE_NAME='Cars' AND COLUMN_NAME='SMSNotificationSent')
       ALTER TABLE Cars ADD SMSNotificationSent BIT DEFAULT 0
     `);
     
-    // Add CustomerCarrier column if it doesn't exist
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS 
                      WHERE TABLE_NAME='Cars' AND COLUMN_NAME='CustomerCarrier')
       ALTER TABLE Cars ADD CustomerCarrier NVARCHAR(50) NULL
     `);
     
-    console.log("✅ Database tables verified/created");
-    await pool.close();
+    console.log("✅ Database tables verified");
   } catch (err) {
     console.error("❌ Database initialization error:", err);
   }
 }
 
-// Initialize database on startup
-initializeDatabase();
+// Initialize application
+async function initializeApp() {
+  await initializePool();
+  await initializeDatabase();
+}
+
+// --- AUTH ENDPOINTS ---
+app.post('/login', express.json(), async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) return res.status(400).send('Missing credentials');
+  try {
+    const result = await pool.request()
+      .input('Username', sql.NVarChar, username)
+      .query('SELECT * FROM Users WHERE Username = @Username');
+    const user = result.recordset[0];
+    if (!user) return res.status(401).send('Invalid credentials');
+    const match = await bcrypt.compare(password, user.PasswordHash);
+    if (!match) return res.status(401).send('Invalid credentials');
+    req.session.user = { username: user.Username, role: user.Role };
+    res.send('success');
+  } catch (err) {
+    res.status(500).send('Login error');
+  }
+});
+
+app.post('/register', express.json(), async (req, res) => {
+  const { username, password, role = 'technician' } = req.body;
+  if (!username || !password) return res.status(400).send('Missing credentials');
+  try {
+    const exists = await pool.request()
+      .input('Username', sql.NVarChar, username)
+      .query('SELECT * FROM Users WHERE Username = @Username');
+    if (exists.recordset.length > 0) return res.status(409).send('Username already exists');
+    const hash = await bcrypt.hash(password, 10);
+    await pool.request()
+      .input('Username', sql.NVarChar, username)
+      .input('PasswordHash', sql.NVarChar, hash)
+      .input('Role', sql.NVarChar, role)
+      .query('INSERT INTO Users (Username, PasswordHash, Role) VALUES (@Username, @PasswordHash, @Role)');
+    res.send('User registered');
+  } catch (err) {
+    res.status(500).send('Registration error');
+  }
+});
+
+app.post('/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.send('Logged out');
+  });
+});
+
+app.get('/api/me', (req, res) => {
+  if (!req.session.user) return res.status(401).json({ success: false });
+  res.json({ username: req.session.user.username, role: req.session.user.role });
+});
+
+// --- ADMIN USER MANAGEMENT ENDPOINTS ---
+app.get('/api/users', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.request().query('SELECT Username, Role FROM Users');
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).send('Error fetching users');
+  }
+});
+
+app.post('/api/users/role', requireAdmin, express.json(), async (req, res) => {
+  const { username, role } = req.body;
+  if (!username || !role) return res.status(400).send('Missing data');
+  try {
+    await pool.request()
+      .input('Username', sql.NVarChar, username)
+      .input('Role', sql.NVarChar, role)
+      .query('UPDATE Users SET Role = @Role WHERE Username = @Username');
+    res.send('Role updated');
+  } catch (err) {
+    res.status(500).send('Error updating role');
+  }
+});
+
+app.post('/api/users/delete', requireAdmin, express.json(), async (req, res) => {
+  const { username } = req.body;
+  if (!username) return res.status(400).send('Missing username');
+  try {
+    await pool.request()
+      .input('Username', sql.NVarChar, username)
+      .query('DELETE FROM Users WHERE Username = @Username');
+    res.send('User deleted');
+  } catch (err) {
+    res.status(500).send('Error deleting user');
+  }
+});
 
 // FREE SMS Notification Function using Email-to-SMS
 async function sendFreeSMS(carId, customerName, customerPhone, carDetails, carrier = 'tmobile') {
@@ -140,10 +291,8 @@ Thank you for choosing Master Body Shop!
     const pool = await sql.connect(dbConfig);
     await pool.request()
       .input('Id', sql.Int, carId)
-      .input('Carrier', sql.NVarChar, carrier) 
-      .query('UPDATE Cars SET SMSNotificationSent = 1, CustomerCarrier = @Carrier WHERE Id = @Id', 
-        [{ name: 'Carrier', type: sql.NVarChar, value: carrier }]);
-    await pool.close();
+      .input('Carrier', sql.NVarChar, carrier)
+      .query('UPDATE Cars SET SMSNotificationSent = 1, CustomerCarrier = @Carrier WHERE Id = @Id');
     
     return true;
 
@@ -167,13 +316,10 @@ Thank you for choosing Master Body Shop!
           console.log(`✅ SMS sent via fallback carrier: ${fallbackCarrier}`);
           
           // Update carrier in database
-          const pool = await sql.connect(dbConfig);
           await pool.request()
             .input('Id', sql.Int, carId)
-            .input('Carrier', sql.NVarChar, carrier) 
-            .query('UPDATE Cars SET SMSNotificationSent = 1, CustomerCarrier = @Carrier WHERE Id = @Id', 
-              [{ name: 'Carrier', type: sql.NVarChar, value: fallbackCarrier }]);
-          await pool.close();
+            .input('Carrier', sql.NVarChar, fallbackCarrier)
+            .query('UPDATE Cars SET SMSNotificationSent = 1, CustomerCarrier = @Carrier WHERE Id = @Id');
           
           return true;
         } catch (fallbackError) {
@@ -189,10 +335,10 @@ Thank you for choosing Master Body Shop!
 }
 
 // Enhanced intake route with phone number and carrier support
-app.post("/intake", async (req, res) => {
-  let pool;
+app.post("/add-car", async (req, res) => {
+  const transaction = new sql.Transaction(pool);
+  
   try {
-    pool = await sql.connect(dbConfig);
     const {
       customer,
       year,
@@ -210,14 +356,14 @@ app.post("/intake", async (req, res) => {
       tech,
       dateDone,
       customerPhone,
-      customerCarrier = 'tmobile', // New field
+      customerCarrier = 'tmobile',
       photos = []
     } = req.body;
 
     console.log(`📸 Received intake with ${photos.length} photos`);
 
-    // Validate required fields
-    if (!customer || !year || !make || !model || !arrivalDate) {
+    // Validate required fields based on actual database structure
+    if (!customer || !year || !make || !model || !arrivalDate || !partsOrdered || !readyForWork || !workStatus) {
       return res.status(400).send("❌ Missing required fields");
     }
 
@@ -228,82 +374,79 @@ app.post("/intake", async (req, res) => {
     }
 
     // Validate carrier
-    if (!carrierGateways[customerCarrier]) {
+    if (customerCarrier && !carrierGateways[customerCarrier]) {
       return res.status(400).send("❌ Invalid carrier selection");
     }
 
-    // Start transaction
-    const transaction = new sql.Transaction(pool);
     await transaction.begin();
 
-    try {
-      // Insert car data
-      const carResult = await transaction.request()
-        .input("Customer", sql.NVarChar, customer)
-        .input("Year", sql.Int, year)
-        .input("Make", sql.NVarChar, make)
-        .input("Model", sql.NVarChar, model)
-        .input("Color", sql.NVarChar, color || null)
-        .input("VIN", sql.NVarChar, vin || null)
-        .input("ArrivalDate", sql.Date, arrivalDate)
-        .input("PartsOrdered", sql.NVarChar, partsOrdered)
-        .input("PartOrderDate", sql.Date, partOrderDate || null)
-        .input("PartsArrivalDate", sql.Date, partsArrivalDate || null)
-        .input("ReadyForWork", sql.NVarChar, readyForWork)
-        .input("WorkStatus", sql.NVarChar, workStatus)
-        .input("Bay", sql.NVarChar, bay || null)
-        .input("Tech", sql.NVarChar, tech || null)
-        .input("DateDone", sql.Date, dateDone || null)
-        .input("CustomerPhone", sql.NVarChar, customerPhone || null)
-        .input("CustomerCarrier", sql.NVarChar, customerCarrier || null)
-        .query(`
-          INSERT INTO Cars 
-          (Customer, Year, Make, Model, COLOR, VIN, ArrivalDate, PartsOrdered, PartOrderDate, PartsArrivalDate, ReadyForWork, WorkStatus, Bay, Tech, DateDone, CustomerPhone, CustomerCarrier)
-          OUTPUT INSERTED.Id
-          VALUES 
-          (@Customer, @Year, @Make, @Model, @Color, @VIN, @ArrivalDate, @PartsOrdered, @PartOrderDate, @PartsArrivalDate, @ReadyForWork, @WorkStatus, @Bay, @Tech, @DateDone, @CustomerPhone, @CustomerCarrier)
-        `);
+    // Insert car data using actual column names from database
+    const carResult = await transaction.request()
+      .input("Customer", sql.NVarChar, customer)
+      .input("Year", sql.Int, year)
+      .input("Make", sql.NVarChar, make)
+      .input("Model", sql.NVarChar, model)
+      .input("COLOR", sql.NVarChar, color || null) // Note: COLOR in uppercase as per DB
+      .input("VIN", sql.NVarChar, vin || null)
+      .input("ArrivalDate", sql.Date, arrivalDate)
+      .input("PartsOrdered", sql.NVarChar, partsOrdered)
+      .input("PartOrderDate", sql.Date, partOrderDate || null)
+      .input("PartsArrivalDate", sql.Date, partsArrivalDate || null)
+      .input("ReadyForWork", sql.NVarChar, readyForWork)
+      .input("WorkStatus", sql.NVarChar, workStatus)
+      .input("Bay", sql.NVarChar, bay || null)
+      .input("Tech", sql.NVarChar, tech || null)
+      .input("DateDone", sql.Date, dateDone || null)
+      .input("CustomerPhone", sql.NVarChar, customerPhone || null)
+      .input("CustomerCarrier", sql.NVarChar, customerCarrier || null)
+      .query(`
+        INSERT INTO Cars 
+        (Customer, Year, Make, Model, COLOR, VIN, ArrivalDate, PartsOrdered, PartOrderDate, PartsArrivalDate, ReadyForWork, WorkStatus, Bay, Tech, DateDone, CustomerPhone, CustomerCarrier)
+        OUTPUT INSERTED.Id
+        VALUES 
+        (@Customer, @Year, @Make, @Model, @COLOR, @VIN, @ArrivalDate, @PartsOrdered, @PartOrderDate, @PartsArrivalDate, @ReadyForWork, @WorkStatus, @Bay, @Tech, @DateDone, @CustomerPhone, @CustomerCarrier)
+      `);
 
-      const carId = carResult.recordset[0].Id;
+    const carId = carResult.recordset[0].Id;
 
-      // Insert photos if any
-      if (photos.length > 0) {
-        for (const photo of photos) {
-          await transaction.request()
-            .input("CarId", sql.Int, carId)
-            .input("PhotoData", sql.Text, photo.data)
-            .input("Timestamp", sql.NVarChar, photo.timestamp)
-            .query(`
-              INSERT INTO CarPhotos (CarId, PhotoData, Timestamp)
-              VALUES (@CarId, @PhotoData, @Timestamp)
-            `);
-        }
-        console.log(`✅ Inserted ${photos.length} photos for car ID: ${carId}`);
+    // Insert photos if any
+    if (photos.length > 0) {
+      for (const photo of photos) {
+        await transaction.request()
+          .input("CarId", sql.Int, carId)
+          .input("PhotoData", sql.Text, photo.data)
+          .input("Timestamp", sql.NVarChar, photo.timestamp)
+          .query(`
+            INSERT INTO CarPhotos (CarId, PhotoData, Timestamp)
+            VALUES (@CarId, @PhotoData, @Timestamp)
+          `);
       }
-
-      await transaction.commit();
-      res.send(`✅ Car intake recorded successfully with ${photos.length} photos!`);
-
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
+      console.log(`✅ Inserted ${photos.length} photos for car ID: ${carId}`);
     }
 
+    await transaction.commit();
+    res.json({ 
+      success: true, 
+      message: `✅ Car intake recorded successfully with ${photos.length} photos!`,
+      carId: carId
+    });
+
   } catch (err) {
+    await transaction.rollback();
     console.error("❌ Database error:", err);
-    res.status(500).send("❌ Error inserting car data");
-  } finally {
-    if (pool) await pool.close();
+    res.status(500).json({ 
+      success: false, 
+      message: "❌ Error inserting car data",
+      error: err.message 
+    });
   }
 });
 
 // Update route with FREE SMS notification
 app.put("/update-car/:id", async (req, res) => {
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
-    const { id } = req.params;
-    const { workStatus, readyForWork, partsOrdered, notes, customerPayment, customerPhone, customerCarrier } = req.body;
+  const { id } = req.params;
+  const { workStatus, readyForWork, partsOrdered, notes, customerPayment, customerPhone, customerCarrier, photo } = req.body;
 
     console.log(`🔄 Updating car ${id} with status: ${workStatus}`);
 
@@ -313,22 +456,36 @@ app.put("/update-car/:id", async (req, res) => {
       .query("SELECT WorkStatus, Customer, CustomerPhone, CustomerCarrier, Year, Make, Model, SMSNotificationSent FROM Cars WHERE Id = @Id");
 
     if (currentCarResult.recordset.length === 0) {
-      return res.status(404).send("Car not found");
+      return res.status(404).json({ success: false, message: "Car not found" });
     }
 
     const currentCar = currentCarResult.recordset[0];
     const previousStatus = currentCar.WorkStatus;
 
-    // Update car data
+    // Use current value if missing in request
+    function fallback(val, current) {
+      if (typeof val === 'string') {
+        return val.trim() !== '' ? val : current;
+      }
+      return typeof val !== 'undefined' && val !== null ? val : current;
+    }
+    const newWorkStatus = typeof workStatus !== 'undefined' && workStatus !== null && workStatus !== '' ? workStatus : currentCar.WorkStatus;
+    const newReadyForWork = typeof readyForWork !== 'undefined' && readyForWork !== null && readyForWork !== '' ? readyForWork : currentCar.ReadyForWork;
+    const newPartsOrdered = typeof partsOrdered !== 'undefined' && partsOrdered !== null && partsOrdered !== '' ? partsOrdered : currentCar.PartsOrdered;
+    const newNotes = typeof notes !== 'undefined' && notes !== null && notes !== '' ? notes : currentCar.Notes ?? null;
+    const newCustomerPayment = typeof customerPayment !== 'undefined' && customerPayment !== null ? (customerPayment ? 1 : 0) : (currentCar.CustomerPayment ? 1 : 0);
+    const newCustomerPhone = typeof customerPhone !== 'undefined' && customerPhone !== null && customerPhone !== '' ? customerPhone : currentCar.CustomerPhone ?? null;
+    const newCustomerCarrier = typeof customerCarrier !== 'undefined' && customerCarrier !== null && customerCarrier !== '' ? customerCarrier : currentCar.CustomerCarrier ?? null;
+
     await pool.request()
       .input("Id", sql.Int, id)
-      .input("WorkStatus", sql.NVarChar, workStatus)
-      .input("ReadyForWork", sql.NVarChar, readyForWork)
-      .input("PartsOrdered", sql.NVarChar, partsOrdered)
-      .input("Notes", sql.NVarChar, notes || null)
-      .input("CustomerPayment", sql.Bit, customerPayment ? 1 : 0)
-      .input("CustomerPhone", sql.NVarChar, customerPhone || null)
-      .input("CustomerCarrier", sql.NVarChar, customerCarrier || null)
+      .input("WorkStatus", sql.NVarChar, newWorkStatus)
+      .input("ReadyForWork", sql.NVarChar, newReadyForWork)
+      .input("PartsOrdered", sql.NVarChar, newPartsOrdered)
+      .input("Notes", sql.NVarChar, newNotes)
+      .input("CustomerPayment", sql.Bit, newCustomerPayment)
+      .input("CustomerPhone", sql.NVarChar, newCustomerPhone)
+      .input("CustomerCarrier", sql.NVarChar, newCustomerCarrier)
       .query(`
         UPDATE Cars
         SET WorkStatus = @WorkStatus,
@@ -338,7 +495,6 @@ app.put("/update-car/:id", async (req, res) => {
             CustomerPayment = @CustomerPayment,
             CustomerPhone = ISNULL(@CustomerPhone, CustomerPhone),
             CustomerCarrier = ISNULL(@CustomerCarrier, CustomerCarrier)
-            ${workStatus === "Completed" && previousStatus !== "Completed" ? ", DateDone = GETDATE()" : ""}
         WHERE Id = @Id
       `);
 
@@ -346,7 +502,7 @@ app.put("/update-car/:id", async (req, res) => {
     if (workStatus === "Completed" && previousStatus !== "Completed") {
       console.log(`🚗 Car ${id} completed! Sending FREE SMS to ${currentCar.Customer}`);
       
-      if (currentCar && !currentCar.SMSNotificationSent) {
+      if (currentCar.CustomerPhone && !currentCar.SMSNotificationSent) {
         const carInfo = `${currentCar.Year} ${currentCar.Make} ${currentCar.Model}`;
         const carrier = currentCar.CustomerCarrier || 'tmobile';
         
@@ -363,21 +519,35 @@ app.put("/update-car/:id", async (req, res) => {
       }
     }
 
-    res.send("✅ Car updated successfully!");
+    // If a new photo is provided, save it to CarPhotos
+    if (photo) {
+      try {
+        await pool.request()
+          .input("CarId", sql.Int, id)
+          .input("PhotoData", sql.Text, photo)
+          .input("Timestamp", sql.NVarChar, new Date().toISOString())
+          .query(`INSERT INTO CarPhotos (CarId, PhotoData, Timestamp) VALUES (@CarId, @PhotoData, @Timestamp)`);
+        console.log(`🖼️ Photo added for car ${id}`);
+      } catch (photoErr) {
+        console.error("❌ Error saving photo:", photoErr);
+        // Optionally, you can send a warning in the response
+      }
+    }
+    res.json({ success: true, message: "✅ Car updated successfully!" });
 
   } catch (err) {
     console.error("❌ Database error:", err);
-    res.status(500).send("❌ Error updating car: " + err.message);
-  } finally {
-    if (pool) await pool.close();
+    res.status(500).json({ 
+      success: false, 
+      message: "❌ Error updating car",
+      error: err.message 
+    });
   }
 });
 
 // Get car with photos
 app.get("/car/:id", async (req, res) => {
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
     const carId = req.params.id;
 
     // Get car details
@@ -386,7 +556,7 @@ app.get("/car/:id", async (req, res) => {
       .query("SELECT * FROM Cars WHERE Id = @Id");
 
     if (carResult.recordset.length === 0) {
-      return res.status(404).send("Car not found");
+      return res.status(404).json({ success: false, message: "Car not found" });
     }
 
     // Get photos for this car
@@ -399,21 +569,105 @@ app.get("/car/:id", async (req, res) => {
       photos: photosResult.recordset
     };
 
-    res.json(carData);
+    res.json({ success: true, data: carData });
 
   } catch (err) {
     console.error("❌ Database error:", err);
-    res.status(500).send("❌ Error fetching car data");
-  } finally {
-    if (pool) await pool.close();
+    res.status(500).json({ 
+      success: false, 
+      message: "❌ Error fetching car data",
+      error: err.message 
+    });
+  }
+});
+
+// Get car photos for car-details.html
+app.get("/car/:id/photos", async (req, res) => {
+  try {
+    const carId = req.params.id;
+    const result = await pool.request()
+      .input("CarId", sql.Int, carId)
+      .query("SELECT PhotoData FROM CarPhotos WHERE CarId = @CarId ORDER BY CreatedAt DESC");
+    res.json(result.recordset);
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Error fetching photos" });
+  }
+});
+
+// --- Car Parts Endpoints for parts-editor.html ---
+// Get all parts for a car
+app.get("/car/:id/parts", async (req, res) => {
+  try {
+    const carId = req.params.id;
+    const result = await pool.request()
+      .input("CarId", sql.Int, carId)
+      .query("SELECT Id, Name, Status FROM CarParts WHERE CarId = @CarId AND Name IS NOT NULL AND Status IS NOT NULL ORDER BY Id");
+    res.json(result.recordset.map(p => ({ id: p.Id, name: p.Name, status: p.Status })));
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Error fetching parts" });
+  }
+});
+
+// Add a part
+app.post("/car/:id/parts", express.json(), async (req, res) => {
+  try {
+    const carId = req.params.id;
+    const { partName, status } = req.body;
+    if (!partName || !status) return res.status(400).send("Missing partName or status");
+    await pool.request()
+      .input("CarId", sql.Int, carId)
+      .input("Name", sql.NVarChar, partName)
+      .input("Status", sql.NVarChar, status)
+      .query("INSERT INTO CarParts (CarId, Name, Status) VALUES (@CarId, @Name, @Status)");
+    res.send("Part added");
+  } catch (err) {
+    res.status(500).send("Error adding part");
+  }
+});
+
+// Update part status
+app.put("/car/:id/parts", express.json(), async (req, res) => {
+  try {
+    const carId = req.params.id;
+    const { idx, status } = req.body;
+    // idx is the index in the array, but we need the part's Id
+    const parts = await pool.request()
+      .input("CarId", sql.Int, carId)
+      .query("SELECT Id FROM CarParts WHERE CarId = @CarId ORDER BY Id");
+    const partId = parts.recordset[idx]?.Id;
+    if (!partId) return res.status(404).send("Part not found");
+    await pool.request()
+      .input("Id", sql.Int, partId)
+      .input("Status", sql.NVarChar, status)
+      .query("UPDATE CarParts SET Status = @Status WHERE Id = @Id");
+    res.send("Part updated");
+  } catch (err) {
+    res.status(500).send("Error updating part");
+  }
+});
+
+// Delete a part
+app.delete("/car/:id/parts", express.json(), async (req, res) => {
+  try {
+    const carId = req.params.id;
+    const { idx } = req.body;
+    const parts = await pool.request()
+      .input("CarId", sql.Int, carId)
+      .query("SELECT Id FROM CarParts WHERE CarId = @CarId ORDER BY Id");
+    const partId = parts.recordset[idx]?.Id;
+    if (!partId) return res.status(404).send("Part not found");
+    await pool.request()
+      .input("Id", sql.Int, partId)
+      .query("DELETE FROM CarParts WHERE Id = @Id");
+    res.send("Part deleted");
+  } catch (err) {
+    res.status(500).send("Error deleting part");
   }
 });
 
 // Get photo data by photo ID
 app.get("/photo/:id", async (req, res) => {
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
     const photoId = req.params.id;
 
     const result = await pool.request()
@@ -438,16 +692,12 @@ app.get("/photo/:id", async (req, res) => {
   } catch (err) {
     console.error("❌ Database error:", err);
     res.status(500).send("❌ Error fetching photo");
-  } finally {
-    if (pool) await pool.close();
   }
 });
 
 // Get first photo for a car
 app.get("/photo/car/:carId", async (req, res) => {
-  let pool;
   try {
-    pool = await sql.connect(dbConfig);
     const carId = req.params.carId;
 
     const result = await pool.request()
@@ -472,141 +722,93 @@ app.get("/photo/car/:carId", async (req, res) => {
   } catch (err) {
     console.error("❌ Database error:", err);
     res.status(500).send("❌ Error fetching photo");
-  } finally {
-    if (pool) await pool.close();
   }
 });
 
 // Get all cars for dashboard
-app.get("/dashboard", async (req, res) => {
-  let pool;
+app.get("/dashboard", requireAuth, async (req, res) => {
   try {
     pool = await sql.connect(dbConfig);
     
-    // Filtering
-    let whereClauses = [];
-    let request = pool.request();
-
     if (req.query.id) {
-      request.input('id', sql.Int, req.query.id);
-      whereClauses.push('c.Id = @id');
-    }
-    if (req.query.status) {
-      request.input('status', sql.NVarChar, req.query.status);
-      whereClauses.push('c.WorkStatus = @status');
-    }
-    if (req.query.customer) {
-      request.input('customer', sql.NVarChar, `%${req.query.customer}%`);
-      whereClauses.push('c.Customer LIKE @customer');
-    }
-    if (req.query.make) {
-      request.input('make', sql.NVarChar, `%${req.query.make}%`);
-      whereClauses.push('c.Make LIKE @make');
-    }
-    if (req.query.model) {
-      request.input('model', sql.NVarChar, `%${req.query.model}%`);
-      whereClauses.push('c.Model LIKE @model');
-    }
-    if (req.query.vin) {
-      request.input('vin', sql.NVarChar, `%${req.query.vin}%`);
-      whereClauses.push('c.VIN LIKE @vin');
+      const result = await pool.request()
+        .input('id', sql.Int, req.query.id)
+        .query(`
+          SELECT c.*, 
+                 (SELECT COUNT(*) FROM CarPhotos WHERE CarId = c.Id) as PhotoCount
+          FROM Cars c 
+          WHERE c.Id = @id
+        `);
+      return res.json(result.recordset[0]);
     }
 
-    // Exclude archived cars (Completed and Paid)
-    whereClauses.push("NOT (c.WorkStatus = 'Completed' AND c.CustomerPayment = 1)");
-    let whereSQL = whereClauses.length > 0 ? ('WHERE ' + whereClauses.join(' AND ')) : '';
-    const result = await request.query(`
+    const result = await pool.request().query(`
       SELECT c.*, 
              (SELECT COUNT(*) FROM CarPhotos WHERE CarId = c.Id) as PhotoCount
       FROM Cars c
       ${whereSQL}
       ORDER BY c.ArrivalDate DESC
     `);
+    
     res.json(result.recordset);
   } catch (err) {
     console.error("❌ Database error:", err);
-    res.status(500).send("❌ Error fetching cars");
-  } finally {
-    if (pool) await pool.close();
+    res.status(500).json({ 
+      success: false, 
+      message: "❌ Error fetching cars",
+      error: err.message 
+    });
   }
 });
 
 // Manual FREE SMS trigger endpoint
-// Archive dashboard: show only completed and paid cars
-app.get("/archive-dashboard", async (req, res) => {
-  let pool;
-  try {
-    pool = await sql.connect(dbConfig);
-    let whereClauses = ["c.WorkStatus = 'Completed'", "c.CustomerPayment = 1"];
-    let request = pool.request();
-    if (req.query.customer) {
-      request.input('customer', sql.NVarChar, `%${req.query.customer}%`);
-      whereClauses.push('c.Customer LIKE @customer');
-    }
-    if (req.query.make) {
-      request.input('make', sql.NVarChar, `%${req.query.make}%`);
-      whereClauses.push('c.Make LIKE @make');
-    }
-    if (req.query.model) {
-      request.input('model', sql.NVarChar, `%${req.query.model}%`);
-      whereClauses.push('c.Model LIKE @model');
-    }
-    if (req.query.vin) {
-      request.input('vin', sql.NVarChar, `%${req.query.vin}%`);
-      whereClauses.push('c.VIN LIKE @vin');
-    }
-    let whereSQL = 'WHERE ' + whereClauses.join(' AND ');
-    const result = await request.query(`
-      SELECT c.*, 
-             (SELECT COUNT(*) FROM CarPhotos WHERE CarId = c.Id) as PhotoCount
-      FROM Cars c
-      ${whereSQL}
-      ORDER BY c.ArrivalDate DESC
-    `);
-    res.json(result.recordset);
-  } catch (err) {
-    console.error("❌ Database error:", err);
-    res.status(500).send("❌ Error fetching archived cars");
-  } finally {
-    if (pool) await pool.close();
-  }
-});
 app.post("/send-sms/:carId", async (req, res) => {
   try {
-    const pool = await sql.connect(dbConfig);
     const carId = req.params.carId;
 
     const carResult = await pool.request()
       .input("Id", sql.Int, carId)
-      .query("SELECT Customer, CustomerPhone, CustomerCarrier, Year, Make, Model FROM Cars WHERE Id = @Id");
+      .query("SELECT Customer, CustomerPhone, CustomerCarrier, Year, Make, Model, SMSNotificationSent FROM Cars WHERE Id = @Id");
 
     if (carResult.recordset.length === 0) {
-      return res.status(404).send("Car not found");
+      return res.status(404).json({ success: false, message: "Car not found" });
     }
 
     const car = carResult.recordset[0];
+    
+    if (car.SMSNotificationSent) {
+      return res.status(400).json({ success: false, message: "SMS already sent for this car" });
+    }
+
+    if (!car.CustomerPhone) {
+      return res.status(400).json({ success: false, message: "No phone number available for this car" });
+    }
+
     const carInfo = `${car.Year} ${car.Make} ${car.Model}`;
     const carrier = car.CustomerCarrier || 'tmobile';
     
     const success = await sendFreeSMS(carId, car.Customer, car.CustomerPhone, carInfo, carrier);
     
     if (success) {
-      res.send("✅ FREE SMS notification sent successfully!");
+      res.json({ success: true, message: "✅ FREE SMS notification sent successfully!" });
     } else {
-      res.status(500).send("❌ Failed to send FREE SMS notification");
+      res.status(500).json({ success: false, message: "❌ Failed to send FREE SMS notification" });
     }
 
-    await pool.close();
   } catch (err) {
     console.error("❌ Error sending FREE SMS:", err);
-    res.status(500).send("❌ Error sending FREE SMS notification");
+    res.status(500).json({ 
+      success: false, 
+      message: "❌ Error sending FREE SMS notification",
+      error: err.message 
+    });
   }
 });
 
 // Get available carriers
 // Photo upload for a specific car
 const multer = require('multer');
-const upload = multer();
+
 
 app.post('/upload-photo/:id', upload.single('photo'), async (req, res) => {
   let pool;
@@ -646,16 +848,23 @@ app.post('/upload-photo/:id', upload.single('photo'), async (req, res) => {
   tryUpload();
 });
 app.get("/carriers", (req, res) => {
-  res.json(Object.keys(carrierGateways));
+  res.json({ success: true, data: Object.keys(carrierGateways) });
 });
 
-// Serve homepage
+// Error handling middleware
+
+// Serve homepage and HTML files
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.sendFile(path.join(__dirname, "views", "index.html"));
 });
-
-app.get("/dashboard.html", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "dashboard.html"));
+app.get("/dashboard.html", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "dashboard.html"));
+});
+app.get("/welcome.html", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "welcome.html"));
+});
+app.get("/admin-dashboard.html", requireAuth, (req, res) => {
+  res.sendFile(path.join(__dirname, "views", "admin-dashboard.html"));
 });
 
 const PORT = 3030;
