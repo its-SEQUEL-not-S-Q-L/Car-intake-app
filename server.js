@@ -51,7 +51,7 @@ app.use(session({
 const dbConfig = {
   user: "sa",
   password: "Welcome@100Y!",
-  server: "desktop-kgduetp",
+  server: "Legion-Y-7000p",
   database: "BodyshopDB",
   options: {
     encrypt: false,
@@ -807,7 +807,6 @@ app.post("/send-sms/:carId", async (req, res) => {
 
 // Get available carriers
 // Photo upload for a specific car
-const multer = require('multer');
 
 
 app.post('/upload-photo/:id', upload.single('photo'), async (req, res) => {
